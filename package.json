@@ -1,0 +1,11 @@
+{
+  "name": "sounding-webmcp-demo",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "deploy": "wrangler deploy"
+  },
+  "devDependencies": {
+    "wrangler": "^4.124.0"
+  }
+}

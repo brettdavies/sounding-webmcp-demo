@@ -1,0 +1,13 @@
+node_modules/
+.wrangler/
+dist/
+.DS_Store
+
+# Versioned agent instructions
+!AGENTS.md
+!CLAUDE.md
+!.cursor/
+!.cursor/rules/
+!.cursor/rules/competition-details.mdc
+!.github/
+!.github/copilot-instructions.md

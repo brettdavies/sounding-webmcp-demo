@@ -1,0 +1,6 @@
+---
+description: Exclude competition details from agent work
+alwaysApply: true
+---
+
+Do not open, read, reference, quote, summarize, index, or use `COMPETITION_DETAILS.md`.
