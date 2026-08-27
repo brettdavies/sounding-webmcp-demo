@@ -1,16 +1,11 @@
 /**
- * Sounding — a public depth-reading JSON API used as the WebMCP challenge
- * audit patient. Humans get a page and curl. Agents get llms.txt, a
- * well-known MCP card, and CORS that already works.
- *
- * Live (broken) defaults leave two families of MUST fails for the clip:
- *   - openapi absent (service-desc points at /openapi.json; the file is missing)
- *   - mcp-initialize + mcp-tools-list broken (card discovers /mcp; handshake
- *     is incomplete)
- *
- * Tests construct a passing handler with createSoundingHandler({ complete: true }).
- * Recording-day fixes flip those surfaces in this file; do not ship `complete: true`.
+ * Sounding — public depth / sea-state API with a kinetic buoy homepage.
+ * Humans get the WebGL stage. Agents use /llms.txt, /api/reading, and the
+ * well-known MCP card. Default export keeps incomplete OpenAPI + MCP handshake
+ * surfaces; createSoundingHandler({ complete: true }) is for tests only.
  */
+
+import { getReading } from './sea-state';
 
 export type SoundingOptions = {
   /** Serve /openapi.json and complete the MCP initialize + tools/list handshake. */
@@ -28,8 +23,6 @@ const CORS = {
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
   'Access-Control-Allow-Headers': 'content-type, mcp-session-id',
 } as const;
-
-const READING = { meters: 14.2, station: 'keel-1', as_of: '2026-08-27T05:00:00Z' } as const;
 
 export function createSoundingHandler(opts: SoundingOptions = { complete: false }): ExportedHandler {
   return {
@@ -63,7 +56,7 @@ async function handleSounding(request: Request, opts: SoundingOptions): Promise<
     if (request.method !== 'GET' && request.method !== 'HEAD') {
       return jsonError(405, 'method_not_allowed');
     }
-    return json(READING, 200);
+    return json(getReading(), 200);
   }
 
   if (path === '/llms.txt') {
@@ -143,7 +136,7 @@ async function handleMcp(request: Request, complete: boolean): Promise<Response>
       tools: [
         {
           name: 'get_reading',
-          description: 'Return the current depth reading in meters.',
+          description: 'Return the current depth reading and sea state.',
           inputSchema: { type: 'object', properties: {}, additionalProperties: false },
         },
       ],
@@ -246,7 +239,7 @@ function asRecord(value: unknown): Record<string, unknown> | null {
 function serverCard(origin: string): Record<string, unknown> {
   return {
     name: 'sounding',
-    description: 'Current depth reading as JSON.',
+    description: 'Current depth reading and sea state as JSON.',
     mcp_endpoint: `${origin}/mcp`,
     serverInfo: { name: 'sounding', version: '0.1.0' },
     transport: { type: 'streamable-http', endpoint: `${origin}/mcp` },
@@ -259,14 +252,14 @@ function openapiDoc(origin: string): Record<string, unknown> {
     info: {
       title: 'Sounding',
       version: '0.1.0',
-      description: 'Public depth-reading API. One GET, one current value.',
+      description: 'Public depth-reading and sea-state API.',
     },
     servers: [{ url: origin }],
     paths: {
       '/api/reading': {
         get: {
           operationId: 'getReading',
-          summary: 'Current depth reading',
+          summary: 'Current depth reading and sea state',
           responses: {
             '200': {
               description: 'The current reading',
@@ -283,7 +276,7 @@ function openapiDoc(origin: string): Record<string, unknown> {
 function llmsTxt(origin: string): string {
   return `# Sounding
 
-> Public depth reading as JSON. One GET, current meters at keel-1.
+> Public depth reading and sea state as JSON. Station keel-1 at Mavericks approaches, Pillar Point, CA.
 
 ## API
 
@@ -291,11 +284,13 @@ function llmsTxt(origin: string): string {
 
 ## Programmatic access
 
-Use GET /api/reading for the JSON body. MCP is at ${origin}/mcp once the handshake is complete.
+Use GET /api/reading for depth, wave climate, attitude, and heat set faces.
+Homepage stage is a 2-minute compressed Mavericks heat archetype (face heights, not a dated contest day).
+MCP is at ${origin}/mcp once the handshake is complete.
 
 ## When to use
 
-Call the API when you need the current depth. Prefer /llms.txt over scraping the homepage.
+Call the API when you need the current depth or sea state. Prefer /llms.txt over scraping the homepage.
 `;
 }
 
@@ -315,15 +310,17 @@ Content-Signal: ai-train=yes, search=yes, ai-input=yes
 `;
 
 function homeMarkdown(origin: string): string {
+  const reading = getReading();
   return `---
 title: Sounding
-description: Public depth-reading JSON API. Agent entry points are /llms.txt, /api/reading, and the MCP server card.
+description: Public depth-reading JSON API with a kinetic buoy twin. Agent entry points are /llms.txt, /api/reading, and the MCP server card.
 url: ${origin}/
 ---
 
 # Sounding
 
-Public depth-reading JSON API. The current value is ${READING.meters} meters at ${READING.station}.
+Keel station at Mavericks approaches (Pillar Point). Current value is ${reading.meters} meters at ${reading.station}.
+Homepage stage: 2-minute compressed Mavericks heat archetype (giant faces).
 
 - [llms.txt](${origin}/llms.txt)
 - [OpenAPI](${origin}/openapi.json)
@@ -333,55 +330,147 @@ Public depth-reading JSON API. The current value is ${READING.meters} meters at 
 }
 
 function homeHtml(origin: string): string {
+  const reading = getReading();
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Sounding — depth as JSON</title>
-  <meta name="description" content="Public depth-reading JSON API. Agent entry points: /llms.txt, /api/reading, /openapi.json, and /.well-known/mcp/server-card.json.">
+  <title>Sounding — keel-1</title>
+  <meta name="description" content="Public depth-reading JSON API. A kinetic buoy twin rides the sea on this page. Agents: /llms.txt, /api/reading, /.well-known/mcp/server-card.json.">
   <link rel="service-desc" href="/openapi.json">
   <link rel="alternate" type="text/plain" href="/llms.txt">
   <link rel="describedby" href="/.well-known/mcp/server-card.json">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=IBM+Plex+Mono:wght@400;500&family=Source+Sans+3:wght@400;500&display=swap" rel="stylesheet">
   <script type="application/ld+json">
   {"@context":"https://schema.org","@type":"WebAPI","name":"Sounding","description":"Public depth-reading JSON API","url":"${origin}/","documentation":"${origin}/llms.txt"}
   </script>
-  <style>
-    :root { color-scheme: light dark; }
-    body { margin: 0; font: 18px/1.5 ui-serif, Georgia, serif; background: #f4efe6; color: #1c1914; }
-    @media (prefers-color-scheme: dark) {
-      body { background: #161410; color: #efe8dc; }
-      a { color: #d4b896; }
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.185.1/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.185.1/examples/jsm/"
     }
-    main { max-width: 36rem; margin: 0 auto; padding: 3rem 1.25rem 4rem; }
-    h1 { font-size: 2.25rem; font-weight: 600; letter-spacing: -0.03em; margin: 0 0 0.25rem; }
-    .lede { font-size: 1.05rem; margin: 0 0 2rem; }
-    .reading { font-size: 4rem; font-weight: 600; letter-spacing: -0.04em; line-height: 1; margin: 0; }
-    .unit { font-size: 1rem; letter-spacing: 0.08em; text-transform: uppercase; margin: 0.35rem 0 2rem; }
-    a { color: #6b4a1b; }
-    ul { padding-left: 1.1rem; }
-    noscript { display: block; margin-top: 2rem; }
+  }
+  </script>
+  <style>
+    :root {
+      color-scheme: dark;
+      --ink: #e8eef4;
+      --muted: rgba(232, 238, 244, 0.68);
+      --faint: rgba(232, 238, 244, 0.42);
+      --panel: rgba(6, 14, 22, 0.42);
+      --line: rgba(232, 238, 244, 0.14);
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; height: 100%; overflow: hidden; background: #02080f; color: var(--ink); }
+    body { font-family: "Source Sans 3", system-ui, sans-serif; }
+    #stage { position: fixed; inset: 0; z-index: 0; }
+    #stage canvas { display: block; width: 100%; height: 100%; }
+    .fallback { margin: 2rem; color: var(--muted); font-family: "IBM Plex Mono", monospace; font-size: 0.85rem; }
+    .overlay {
+      position: fixed;
+      z-index: 2;
+      left: clamp(1rem, 4vw, 2.75rem);
+      top: clamp(1rem, 4vh, 2.5rem);
+      width: min(22rem, calc(100vw - 2rem));
+      padding: 1.15rem 1.25rem 1.25rem;
+      border: 1px solid var(--line);
+      border-radius: 2px;
+      background: var(--panel);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      pointer-events: none;
+    }
+    .overlay a { pointer-events: auto; color: #c9dde8; text-decoration: underline; text-underline-offset: 0.15em; }
+    .brand {
+      font-family: Fraunces, Georgia, serif;
+      font-weight: 600;
+      font-size: clamp(1.85rem, 4vw, 2.35rem);
+      letter-spacing: -0.03em;
+      line-height: 1.05;
+      margin: 0 0 0.4rem;
+    }
+    .lede {
+      margin: 0 0 1.15rem;
+      font-size: 0.95rem;
+      line-height: 1.45;
+      color: var(--muted);
+      max-width: 20rem;
+    }
+    .readout {
+      display: grid;
+      gap: 0.35rem;
+      padding-top: 0.85rem;
+      border-top: 1px solid var(--line);
+      font-family: "IBM Plex Mono", ui-monospace, monospace;
+    }
+    .meters {
+      font-size: clamp(1.75rem, 4vw, 2.25rem);
+      font-weight: 500;
+      letter-spacing: -0.04em;
+      line-height: 1;
+      margin: 0;
+    }
+    .meters .unit { font-size: 0.55em; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); margin-left: 0.35rem; }
+    .meta { margin: 0; font-size: 0.72rem; color: var(--faint); letter-spacing: 0.02em; }
+    .meta strong { color: var(--muted); font-weight: 500; }
+    .api {
+      margin: 0.9rem 0 0;
+      font-size: 0.78rem;
+      color: var(--muted);
+      font-family: "IBM Plex Mono", ui-monospace, monospace;
+    }
+    .credit {
+      position: fixed;
+      z-index: 2;
+      right: 1rem;
+      bottom: 0.75rem;
+      margin: 0;
+      font-size: 0.65rem;
+      color: var(--faint);
+      font-family: "IBM Plex Mono", ui-monospace, monospace;
+      pointer-events: none;
+    }
+    @media (max-width: 640px) {
+      .overlay {
+        top: auto;
+        bottom: clamp(1rem, 3vh, 1.5rem);
+        width: min(100% - 2rem, 24rem);
+      }
+      .credit { display: none; }
+    }
   </style>
 </head>
 <body>
-  <main>
-    <h1>Sounding</h1>
-    <p class="lede">A public JSON API for a single depth reading. Humans can read this page. Agents should use the machine surfaces, not scrape the layout.</p>
-    <p class="reading">${READING.meters}</p>
-    <p class="unit">meters · ${READING.station}</p>
-    <section>
-      <p>GET <a href="/api/reading"><code>/api/reading</code></a> returns the current value. The OpenAPI description is advertised from this page and is the remaining publish step. MCP lives at <code>/mcp</code> behind the well-known card.</p>
-    </section>
-    <noscript>
-      <p>Machine entry points:</p>
+  <div id="stage" aria-hidden="true"></div>
+  <aside class="overlay">
+    <h1 class="brand">Sounding</h1>
+    <p class="lede">Keel station off Mavericks — compressed heat. Live stats from the buoy.</p>
+    <div class="readout">
+      <p class="meters"><span id="meters">${reading.meters.toFixed(1)}</span><span class="unit">m</span></p>
+      <p class="meta"><strong id="station">${reading.station}</strong> · <span id="place">${reading.place}</span></p>
+      <p class="meta"><span id="as-of">${reading.as_of_local ?? reading.as_of}</span></p>
+      <p class="meta"><span id="wave">face ${(reading.wave.face_m ?? reading.wave.height_m).toFixed(1)} m · ${reading.wave.period_s} s · ${reading.wave.direction_deg}°</span></p>
+    </div>
+    <p class="api">GET <a href="/api/reading"><code>/api/reading</code></a></p>
+  </aside>
+  <p class="credit">ocean: spectral cascade FFT (skill tier) · cliffs/HDRI: Poly Haven CC0 · buoy: Gerard Llorach / ICATMAR</p>
+  <noscript>
+    <main style="margin:2rem;max-width:36rem;color:#e8eef4;font-family:Georgia,serif">
+      <h1>Sounding</h1>
+      <p>Current depth ${reading.meters} m at ${reading.station}. Enable JavaScript for the kinetic buoy, or use the machine entry points.</p>
       <ul>
         <li><a href="/llms.txt">/llms.txt</a></li>
+        <li><a href="/api/reading">/api/reading</a></li>
         <li><a href="/openapi.json">/openapi.json</a></li>
         <li><a href="/.well-known/mcp/server-card.json">MCP server card</a></li>
-        <li><a href="/api/reading">/api/reading</a></li>
       </ul>
-    </noscript>
-  </main>
+    </main>
+  </noscript>
+  <script type="module" src="/scene.js"></script>
 </body>
 </html>
 `;

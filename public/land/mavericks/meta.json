@@ -1,0 +1,24 @@
+{
+  "pixel_m": 4.0,
+  "rows": 1000,
+  "cols": 1000,
+  "origin_easting": 542490.0,
+  "origin_northing": 4151852.0,
+  "utm_zone": 10,
+  "datum": "NAVD88",
+  "source": "USGS DS684 DEM_1 Half Moon Bay",
+  "pillar_easting": 544490.1367044549,
+  "pillar_northing": 4149850.0999625884,
+  "z_min": -36.970001220703125,
+  "z_max": 112.12699890136719,
+  "pillar_local": {
+    "x": -182.0,
+    "z": -322.0
+  },
+  "pillar_elev_m": 48.645809173583984,
+  "station_local": {
+    "x": -182.0,
+    "z": -322.0,
+    "y": 48.645809173583984
+  }
+}

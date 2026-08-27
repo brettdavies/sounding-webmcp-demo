@@ -1,0 +1,44 @@
+{
+  "station": "keel-1",
+  "place": "Mavericks approaches, Pillar Point, CA",
+  "buoy": "archetype",
+  "source": "Synthetic Mavericks heat — face heights and set structure grounded in historical big-wave reports (40–60 ft faces, W–WNW long-period swell, reef-focused break). Not a dated contest reconstruction.",
+  "loop_sec": 120,
+  "wave_gap_sec": [5, 7],
+  "swell": {
+    "direction_deg": 285,
+    "period_s": 18,
+    "direction_note": "W–WNW ~270–295°; long-period Pacific swell focused by Pillar Point reef bathymetry"
+  },
+  "as_of": "heat-loop",
+  "as_of_local": "Mavericks heat — compressed",
+  "meters": 26.5,
+  "wave": {
+    "height_m": 15.0,
+    "period_s": 18,
+    "direction_deg": 285,
+    "face_m": 15.0,
+    "direction_note": "Face height (trough-to-crest), not offshore Hs"
+  },
+  "attitude": { "heave_m": 0, "pitch_deg": 0, "roll_deg": 0 },
+  "tide": { "stage": "mid, falling", "approx_ft": 4 },
+  "event": {
+    "name": "Mavericks heat (archetype)",
+    "window_local": "2-minute compressed heat loop",
+    "morning_note": "Sets build, bombs land, short lulls — paced like a heat, not a day.",
+    "afternoon_note": "Face heights target rideable Mavericks scale (~12–18 m; bombs higher).",
+    "featured_phase": "morning_high_tide"
+  },
+  "sets": [
+    { "label": "opener", "faces_m": [12.5, 13.8, 14.2, 15.5] },
+    { "label": "lull", "faces_m": [7.5, 6.8] },
+    { "label": "main", "faces_m": [14.0, 16.5, 18.0, 17.2, 15.8] },
+    { "label": "lull", "faces_m": [7.0, 6.5] },
+    { "label": "closing", "faces_m": [13.5, 15.0, 16.8, 14.5, 13.0] }
+  ],
+  "credits": {
+    "buoy": "Oceanographic Buoy MSM — Gerard Llorach / ICATMAR",
+    "cliffs": "Poly Haven coastal_cliff_01, namaqualand_cliff_01 (CC0)",
+    "hdri": "Poly Haven salt_rock_beach_cloudy (CC0)"
+  }
+}
