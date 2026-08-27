@@ -13,8 +13,9 @@ import {
  * @param {URLSearchParams} params
  */
 export async function bootLandAsset(mount, params) {
-  const viewName = params.get('view') || 'aerial';
-  const view = MAVERICKS_VIEWS[viewName] || MAVERICKS_VIEWS.aerial;
+  // Default: fallaway — offshore hero (undersea + tip + radome).
+  const viewName = params.get('view') || 'fallaway';
+  const view = MAVERICKS_VIEWS[viewName] || MAVERICKS_VIEWS.fallaway;
 
   const renderer = new THREE.WebGLRenderer({
     antialias: true,

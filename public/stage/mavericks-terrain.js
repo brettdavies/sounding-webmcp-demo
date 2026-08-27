@@ -1,6 +1,6 @@
 /**
  * Mavericks / Pillar Point terrain from USGS DS 684 DEM_1 (2 m → 4 m crop).
- * Land-only asset: coast, point, undersea bathymetry. No ocean / buoy.
+ * Albedo: NAIP 2022 ortho + Poly Haven cliff/rock bake. Cliff normals on steep faces.
  */
 import * as THREE from 'three';
 
@@ -56,6 +56,20 @@ export const MAVERICKS_VIEWS = Object.freeze({
 });
 
 /**
+ * @param {string} url
+ * @param {{ repeat?: number, colorSpace?: string }} [opts]
+ */
+async function loadTex(url, opts = {}) {
+  const tex = await new THREE.TextureLoader().loadAsync(url);
+  if (opts.colorSpace === 'srgb') tex.colorSpace = THREE.SRGBColorSpace;
+  tex.anisotropy = 8;
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  const r = opts.repeat ?? 1;
+  tex.repeat.set(r, r);
+  return tex;
+}
+
+/**
  * @returns {Promise<{
  *   group: THREE.Group,
  *   meta: MavericksMeta,
@@ -77,57 +91,84 @@ export async function loadMavericksTerrain() {
     );
   }
 
-  const albedo = await new THREE.TextureLoader().loadAsync(
-    '/land/mavericks/albedo.png',
-  );
-  albedo.colorSpace = THREE.SRGBColorSpace;
-  albedo.anisotropy = 8;
+  const [albedo, masks, cliffDiff, cliffNor, seaDiff, seaNor] =
+    await Promise.all([
+      loadTex('/land/mavericks/albedo.png', { colorSpace: 'srgb' }),
+      loadTex('/land/mavericks/masks.png'),
+      loadTex('/textures/cliff/rock_face_03_diff_2k.jpg', {
+        colorSpace: 'srgb',
+        repeat: 48,
+      }),
+      loadTex('/textures/cliff/rock_face_03_nor_gl_2k.jpg', { repeat: 48 }),
+      loadTex('/textures/seafloor/gray_rocks_diff_2k.jpg', {
+        colorSpace: 'srgb',
+        repeat: 36,
+      }),
+      loadTex('/textures/seafloor/gray_rocks_nor_gl_2k.jpg', { repeat: 36 }),
+    ]);
   albedo.wrapS = albedo.wrapT = THREE.ClampToEdgeWrapping;
+  albedo.repeat.set(1, 1);
+  masks.wrapS = masks.wrapT = THREE.ClampToEdgeWrapping;
+  masks.repeat.set(1, 1);
+  masks.colorSpace = THREE.NoColorSpace;
 
-  // Width/depth in meters (cell centers span (n-1)*pixel).
   const widthM = (cols - 1) * pixelM;
   const depthM = (rows - 1) * pixelM;
   const geo = new THREE.PlaneGeometry(widthM, depthM, cols - 1, rows - 1);
   geo.rotateX(-Math.PI / 2);
 
   const pos = geo.attributes.position;
-  const colors = new Float32Array(pos.count * 3);
-  const land = new THREE.Color(0xc4a574);
-  const scrub = new THREE.Color(0x8a9a5c);
-  const rock = new THREE.Color(0x5a564e);
-  const deep = new THREE.Color(0x2e322e);
-
   for (let i = 0; i < pos.count; i++) {
-    // PlaneGeometry grid: i = row-major from -width/2..+width/2, -depth/2..+depth/2
-    // after rotateX, Y is up; Z maps from former Y (v).
     const col = i % cols;
     const row = (i / cols) | 0;
-    const h = heights[row * cols + col];
-    pos.setY(i, h);
-
-    let c;
-    if (h >= 8) c = scrub.clone().lerp(land, 0.45);
-    else if (h >= 0.2) c = land;
-    else if (h >= -8) c = rock;
-    else c = deep;
-    // Slight darken with depth underwater.
-    if (h < 0) c.multiplyScalar(1 + h / 80);
-    colors[i * 3] = c.r;
-    colors[i * 3 + 1] = c.g;
-    colors[i * 3 + 2] = c.b;
+    pos.setY(i, heights[row * cols + col]);
   }
   pos.needsUpdate = true;
-  geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
   geo.computeVertexNormals();
 
   const mat = new THREE.MeshStandardMaterial({
     map: albedo,
-    vertexColors: true,
-    roughness: 0.92,
+    normalMap: cliffNor,
+    normalScale: new THREE.Vector2(0.55, 0.55),
+    roughness: 0.88,
     metalness: 0.02,
   });
-  // Soften albedo so DEM form + vertex colors dominate.
-  if (mat.map) mat.map.colorSpace = THREE.SRGBColorSpace;
+
+  // Soft cliff/seafloor overlay from baked masks + tiled Poly Haven maps.
+  mat.onBeforeCompile = (shader) => {
+    shader.uniforms.cliffMap = { value: cliffDiff };
+    shader.uniforms.seaMap = { value: seaDiff };
+    shader.uniforms.maskMap = { value: masks };
+    shader.uniforms.detailScale = { value: 0.045 };
+
+    shader.fragmentShader = shader.fragmentShader.replace(
+      '#include <common>',
+      /* glsl */ `
+      #include <common>
+      uniform sampler2D cliffMap;
+      uniform sampler2D seaMap;
+      uniform sampler2D maskMap;
+      uniform float detailScale;
+      `,
+    );
+    shader.fragmentShader = shader.fragmentShader.replace(
+      '#include <map_fragment>',
+      /* glsl */ `
+      #include <map_fragment>
+      vec2 wuv = vMapUv * 48.0;
+      // Prefer world-ish tiling via map UV scaled (plane UVs track XZ).
+      vec4 masksS = texture2D(maskMap, vMapUv);
+      float cliffW = masksS.r;
+      float underW = masksS.g;
+      vec3 cliffC = texture2D(cliffMap, wuv).rgb * vec3(1.1, 1.0, 0.88);
+      vec3 seaC = texture2D(seaMap, wuv * 0.7).rgb * 0.55;
+      diffuseColor.rgb = mix(diffuseColor.rgb, cliffC, cliffW * 0.65);
+      diffuseColor.rgb = mix(diffuseColor.rgb, seaC, underW * 0.5);
+      `,
+    );
+  };
+  mat.customProgramCacheKey = () => 'mavericks-cliff-detail-v2';
+  mat.needsUpdate = true;
 
   const mesh = new THREE.Mesh(geo, mat);
   mesh.name = 'mavericksDem';
@@ -139,28 +180,8 @@ export async function loadMavericksTerrain() {
   group.name = 'mavericksLand';
   group.add(mesh);
 
-  // Station locked to DEM plateau (child of land group).
   const station = buildStation(meta.station_local);
   group.add(station);
-
-  // Sea-level reference ring (thin) so fallaway reads vs 0 m NAVD88.
-  const waterline = new THREE.Mesh(
-    new THREE.RingGeometry(8, 12, 48),
-    new THREE.MeshBasicMaterial({
-      color: 0x4a90a8,
-      transparent: true,
-      opacity: 0.35,
-      side: THREE.DoubleSide,
-      depthWrite: false,
-    }),
-  );
-  waterline.rotation.x = -Math.PI / 2;
-  waterline.position.set(
-    meta.station_local?.x ?? 0,
-    0.05,
-    (meta.station_local?.z ?? 0) + 180,
-  );
-  group.add(waterline);
 
   return {
     group,
@@ -168,13 +189,14 @@ export async function loadMavericksTerrain() {
     dispose() {
       geo.dispose();
       mat.dispose();
-      albedo.dispose();
+      for (const t of [albedo, masks, cliffDiff, cliffNor, seaDiff, seaNor]) {
+        t.dispose();
+      }
     },
   };
 }
 
 /**
- * Utilitarian Pillar Point AFS stand-in — parented to DEM plateau.
  * @param {{ x: number, y: number, z: number } | undefined} anchor
  */
 function buildStation(anchor) {

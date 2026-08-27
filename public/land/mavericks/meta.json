@@ -20,5 +20,7 @@
     "x": -182.0,
     "z": -322.0,
     "y": 48.645809173583984
-  }
+  },
+  "albedo": "NAIP 2022 + Poly Haven cliff/rock bake",
+  "ortho": "CA DFW NAIP_2022 ImageServer export"
 }
