@@ -17,3 +17,15 @@
 - `public/textures/seafloor/` — `gray_rocks`, `rocks_ground_02`
 
 Raw USGS GeoTIFF / NAIP masters live under `.context/topo/` (gitignored).
+
+## Locked scene marks (`meta.json`)
+
+| Mark                  | Local XZ (m)            | Notes                                           |
+| --------------------- | ----------------------- | ----------------------------------------------- |
+| `station_local`       | (−182, −322)            | AFS plateau; Y ≈ 49 m NAVD88                    |
+| `break_line.rocks`    | (−338, 197)             | Sail Rock / diagram “Rocks”                     |
+| `break_line.peak`     | (−440, −20)             | Main crest focus for heat faces                 |
+| `break_line.polyline` | N→SSW over −5…−6 m reef | From `pillar-point-diagram.jpg` + DEM contour   |
+| `spectators`          | (160, −80), eye Y ≈ 3.9 | Diagram “Beach - Spectators”; ~2.5 m eye → peak |
+
+Plan view only; still-water ocean plane remains MSL ≈ **Y 0.92 m** NAVD88. View key: `?view=spectators`.

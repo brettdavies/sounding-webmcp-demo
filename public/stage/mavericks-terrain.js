@@ -14,6 +14,20 @@ import * as THREE from 'three';
  *   station_local?: { x: number, y: number, z: number },
  *   pillar_elev_m?: number,
  *   source?: string,
+ *   break_line?: {
+ *     peak: { x: number, z: number },
+ *     rocks: { x: number, z: number },
+ *     polyline: { x: number, z: number }[],
+ *     swell_from_deg?: number,
+ *     depth_band_m?: number[],
+ *   },
+ *   spectators?: {
+ *     x: number,
+ *     z: number,
+ *     ground_y: number,
+ *     eye_height_m: number,
+ *     look_at: { x: number, y: number, z: number },
+ *   },
  * }} MavericksMeta
  */
 
@@ -52,6 +66,12 @@ export const MAVERICKS_VIEWS = Object.freeze({
     position: { x: -280, y: 35, z: 80 },
     lookAt: { x: -200, y: 20, z: -280 },
     fov: 38,
+  },
+  /** Harbor-facing spectator beach; eye ~2.5 m, looking at break peak. */
+  spectators: {
+    position: { x: 160, y: 3.9, z: -80 },
+    lookAt: { x: -440, y: 5, z: -20 },
+    fov: 50,
   },
 });
 

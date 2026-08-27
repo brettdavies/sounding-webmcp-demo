@@ -21,6 +21,44 @@
     "z": -322.0,
     "y": 48.645809173583984
   },
+  "break_line": {
+    "frame": "local_xz_m",
+    "note": "Plan-view crest / break polyline for Mavericks heat faces. Ocean still-water plane is separate (MSL ≈ Y 0.92 m NAVD88).",
+    "source": [
+      ".context/pictures/pillar-point-diagram.jpg (Waves Break Here)",
+      ".context/pictures/wave-energy.jpeg (reef focus / refraction)",
+      "USGS DS684 DEM −5…−6 m NAVD88 contour west of tip",
+      "USCG Sail Rock 37°29′34″N 122°30′02″W (NAD83)"
+    ],
+    "swell_from_deg": 285,
+    "depth_band_m": [-6.5, -4.5],
+    "rocks": {
+      "x": -338,
+      "z": 197,
+      "note": "Sail Rock / diagram Rocks pin"
+    },
+    "peak": {
+      "x": -440,
+      "z": -20,
+      "note": "Main crest focus (Corner-ish) — solitary faces aim here"
+    },
+    "polyline": [
+      { "x": -480, "z": 100 },
+      { "x": -450, "z": 40 },
+      { "x": -440, "z": -20 },
+      { "x": -460, "z": -80 },
+      { "x": -500, "z": -140 }
+    ]
+  },
+  "spectators": {
+    "frame": "local_xz_m",
+    "note": "Beach - Spectators from pillar-point-diagram.jpg: harbor-facing sand east of the tip, outside the breakwater. Low camera (~2–3 m eye height) looking west to the break.",
+    "x": 160,
+    "z": -80,
+    "ground_y": 1.37,
+    "eye_height_m": 2.5,
+    "look_at": { "x": -440, "y": 5, "z": -20 }
+  },
   "albedo": "NAIP 2022 + Poly Haven cliff/rock bake",
   "ortho": "CA DFW NAIP_2022 ImageServer export"
 }
