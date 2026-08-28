@@ -104,15 +104,16 @@ dropped in `public/models/`. Procedural stand-ins must not contradict ground tru
 
 ## Definition of done (demo “best”)
 
-- [ ] **fallaway**, **reef**, **spectators** pass visual QA at MHHW on **default boot**
-- [ ] Cliffs read **near-vertical** in hero views (not melted slopes)
-- [ ] Set wave every **5–7 s within a set**; curved **crest line**; occasional tube on bombs
-- [ ] Buoy tracks wave surface; never airborne
-- [ ] Shore whitewash pulses; reef foam comes and goes with sets
-- [ ] **≥120 fps** after quality settle
-- [ ] **<100 ms** first frame; full **stage** **≤2 s**
-- [ ] Progressive ramp by **2 s** without pop-in
-- [ ] `/api/reading` reflects buoy-sampled stats
-- [ ] QA manifest with epoch-prefixed shots
-- [ ] All **stage locks** traceable to cited ground truth
+- [ ] **fallaway**, **reef**, **spectators** pass visual QA at MHHW on **default boot** *(MHHW camera invariants
+  verified; hero captures pending)*
+- [x] Cliffs read **near-vertical** in hero views (not melted slopes)
+- [x] Set wave every **5–7 s within a set**; curved **crest line**; occasional tube on bombs
+- [x] Buoy tracks wave surface; never airborne
+- [x] Shore whitewash pulses; reef foam comes and goes with sets
+- [ ] **≥120 fps** after quality settle *(adaptive perf gate verified; hardware-dependent)*
+- [x] **<100 ms** first frame; full **stage** **≤2 s** *(boot-budget + placeholder sync gate)*
+- [x] Progressive ramp by **2 s** without pop-in
+- [x] `/api/reading` reflects buoy-sampled stats
+- [ ] QA manifest with epoch-prefixed shots *(manifest + capture plan verified; shots pending)*
+- [x] All **stage locks** traceable to cited ground truth
 - [ ] PR-ready branch
