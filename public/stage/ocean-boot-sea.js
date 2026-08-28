@@ -24,6 +24,7 @@ import {
   sampleSetWave,
   setWaveDisplacementAt,
 } from './set-wave.js';
+import { verifyCurvedCrestOnPolyline } from './break-line-crest.js';
 import { loadEnvironment } from './land.js';
 import {
   MAVERICKS_VIEWS,
@@ -241,7 +242,15 @@ export async function bootSeaStage(mount, params) {
   }
   if (!reading.swell) reading.swell = {};
   reading.swell.direction_deg = reading.swell.direction_deg ?? swellFrom;
-  const setWaveSchedule = buildSetWaveSchedule(reading, buoyXz);
+  const breakPolyline =
+    terrain?.pins?.polyline ?? metaBundle?.pins?.polyline ?? [];
+  const setWaveSchedule = buildSetWaveSchedule(reading, buoyXz, breakPolyline);
+  const crestLine = verifyCurvedCrestOnPolyline(
+    breakPolyline,
+    setWaveSchedule.buoyAlong,
+    setWaveSchedule.dir,
+  );
+  console.info('[mavericks] curved crest line', crestLine);
   let currentView = viewName;
 
   /** @param {string} name */
@@ -265,6 +274,7 @@ export async function bootSeaStage(mount, params) {
     viewVerify: viewBundle.report,
     demAudit: terrain?.demAudit ?? null,
     cliffQa: terrain?.cliffQa ?? null,
+    crestLine,
     mslY,
     buoyXz,
     ready: false,
@@ -324,7 +334,12 @@ export async function bootSeaStage(mount, params) {
         buoyXz.z,
       );
       const cascadeScale = oceanMaterial.uniforms.cascadeScale.value;
-      const face = setWaveDisplacementAt(setWave, buoyXz.x, buoyXz.z);
+      const face = setWaveDisplacementAt(
+        setWave,
+        buoyXz.x,
+        buoyXz.z,
+        setWaveSchedule,
+      );
       const swell = ambientSwellAt(setWaveSchedule, elapsed, buoyXz.x, buoyXz.z);
       const cpuEta = cascade.y * cascadeScale + face.y + swell.y;
       const cpuDisp = new THREE.Vector3(

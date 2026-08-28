@@ -19,7 +19,10 @@ export const OCEAN_WAVE_DISPLACEMENT_GLSL = `
       uniform float setWaveK;
       uniform float setWaveWidth;
       uniform float setWaveCrestAlong;
+      uniform float setWaveBuoyAlong;
       uniform vec2 setWaveDirection;
+      uniform int breakLineCount;
+      uniform vec2 breakLinePts[8];
       uniform float cascadeScale;
       uniform float swellAmplitude;
       uniform float swellSteepness;
@@ -49,13 +52,42 @@ export const OCEAN_WAVE_DISPLACEMENT_GLSL = `
           + gerstnerWave(xz, swell2Direction, swell2Amplitude, swell2Steepness, swell2K, swell2Omega, time);
       }
 
+      float setWaveXiCurved(vec2 xz) {
+        float sP = dot(xz, setWaveDirection);
+        if (breakLineCount < 2) {
+          return sP - setWaveCrestAlong;
+        }
+        vec2 bestQ = breakLinePts[0];
+        float bestD = 1e9;
+        for (int i = 0; i < 7; i++) {
+          if (i >= breakLineCount - 1) {
+            break;
+          }
+          vec2 a = breakLinePts[i];
+          vec2 b = breakLinePts[i + 1];
+          vec2 ab = b - a;
+          float abLen2 = dot(ab, ab);
+          if (abLen2 < 1e-6) {
+            continue;
+          }
+          float t = clamp(dot(xz - a, ab) / abLen2, 0.0, 1.0);
+          vec2 q = a + ab * t;
+          float d = length(xz - q);
+          if (d < bestD) {
+            bestD = d;
+            bestQ = q;
+          }
+        }
+        float sQ = dot(bestQ, setWaveDirection);
+        return sP - setWaveCrestAlong - (sQ - setWaveBuoyAlong);
+      }
+
       vec3 setWaveDisplacement(vec2 xz) {
         vec3 total = ambientSwell(xz);
         if (setWaveActive < 0.01 || setWaveAmplitude < 0.01) {
           return total;
         }
-        float along = dot(xz, setWaveDirection);
-        float xi = along - setWaveCrestAlong;
+        float xi = setWaveXiCurved(xz);
         float env = exp(-(xi * xi) / max(setWaveWidth * setWaveWidth, 1.0));
         float mixW = setWaveActive * env;
         float phase = setWaveK * xi;
@@ -78,7 +110,10 @@ export const OCEAN_DISPLACEMENT_UNIFORM_KEYS = [
   "setWaveK",
   "setWaveWidth",
   "setWaveCrestAlong",
+  "setWaveBuoyAlong",
   "setWaveDirection",
+  "breakLineCount",
+  "breakLinePts",
   "cascadeScale",
   "swellAmplitude",
   "swellSteepness",
@@ -103,6 +138,14 @@ export function syncOceanDisplacementUniforms(target, source) {
     const dst = target[key];
     if (!src || !dst) continue;
     const value = src.value;
+    if (key === "breakLinePts" && Array.isArray(value) && Array.isArray(dst.value)) {
+      for (let i = 0; i < dst.value.length; i++) {
+        if (value[i] && dst.value[i]?.copy) {
+          dst.value[i].copy(value[i]);
+        }
+      }
+      continue;
+    }
     if (
       value &&
       typeof value === "object" &&
@@ -152,7 +195,12 @@ export function createOceanMaterial(cascades, options) {
     setWaveK: { value: 0.05 },
     setWaveWidth: { value: 80 },
     setWaveCrestAlong: { value: 0 },
+    setWaveBuoyAlong: { value: 0 },
     setWaveDirection: { value: new THREE.Vector2(1, 0) },
+    breakLineCount: { value: 0 },
+    breakLinePts: {
+      value: Array.from({ length: 8 }, () => new THREE.Vector2()),
+    },
     /** Scales FFT displacement (duck ambient chop while a set wave owns the shot). */
     cascadeScale: { value: 1 },
     // Always-on long Pacific swell (Gerstner) — the readable in-between sea.
@@ -191,8 +239,7 @@ export function createOceanMaterial(cascades, options) {
         if (setWaveActive < 0.01 || setWaveAmplitude < 0.01) {
           return vec3(0.0);
         }
-        float along = dot(xz, setWaveDirection);
-        float xi = along - setWaveCrestAlong;
+        float xi = setWaveXiCurved(xz);
         float width2 = max(setWaveWidth * setWaveWidth, 1.0);
         float env = exp(-(xi * xi) / width2);
         float mixW = setWaveActive * env;

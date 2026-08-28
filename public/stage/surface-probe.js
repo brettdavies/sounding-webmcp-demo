@@ -57,7 +57,12 @@ function createProbeUniforms(patchLengths) {
     setWaveK: { value: 0.05 },
     setWaveWidth: { value: 80 },
     setWaveCrestAlong: { value: 0 },
+    setWaveBuoyAlong: { value: 0 },
     setWaveDirection: { value: new THREE.Vector2(1, 0) },
+    breakLineCount: { value: 0 },
+    breakLinePts: {
+      value: Array.from({ length: 8 }, () => new THREE.Vector2()),
+    },
     cascadeScale: { value: 1 },
     swellAmplitude: { value: 0.85 },
     swellSteepness: { value: 0.18 },

@@ -4,6 +4,12 @@
  */
 import * as THREE from 'three';
 import { BUOY_XZ } from './sea-state.js';
+import {
+  crestXiAt,
+  breakLineUniforms,
+  MAX_BREAK_LINE_VERTS,
+  normalizeBreakPolyline,
+} from './break-line-crest.js';
 
 const G = 9.81;
 
@@ -18,8 +24,9 @@ const G = 9.81;
  *   wave?: { direction_deg: number, period_s: number, face_m?: number },
  * }} reading
  * @param {{ x: number, z: number }} [mooring]
+ * @param {{ x: number, z: number }[]} [polyline]
  */
-export function buildSetWaveSchedule(reading, mooring = BUOY_XZ) {
+export function buildSetWaveSchedule(reading, mooring = BUOY_XZ, polyline = []) {
   const sets = reading.sets ?? [];
   const gapRange = reading.wave_gap_sec ?? [5, 7];
   const withinSetGap = (gapRange[0] + gapRange[1]) * 0.5;
@@ -67,6 +74,7 @@ export function buildSetWaveSchedule(reading, mooring = BUOY_XZ) {
     periodS,
     dir,
     buoyAlong,
+    polyline: normalizeBreakPolyline(polyline),
   };
 }
 
@@ -160,14 +168,24 @@ function smoothPulse(dist, halfWindow) {
  * @param {ReturnType<typeof sampleSetWave>} setWave
  * @param {number} x
  * @param {number} z
+ * @param {ReturnType<typeof buildSetWaveSchedule>} [schedule]
  * @returns {THREE.Vector3}
  */
-export function setWaveDisplacementAt(setWave, x, z) {
+export function setWaveDisplacementAt(setWave, x, z, schedule) {
   const out = new THREE.Vector3();
   if (setWave.active < 0.01 || setWave.amplitude < 0.01) return out;
 
-  const along = setWave.dir.x * x + setWave.dir.y * z;
-  const xi = along - setWave.crestAlong;
+  const dir = setWave.dir;
+  const xi = schedule?.polyline?.length
+    ? crestXiAt(
+        x,
+        z,
+        setWave.crestAlong,
+        schedule.buoyAlong,
+        dir,
+        schedule.polyline,
+      )
+    : dir.x * x + dir.y * z - setWave.crestAlong;
   const env = Math.exp(-(xi * xi) / Math.max(setWave.width * setWave.width, 1));
   const mix = setWave.active * env;
   const phase = setWave.k * xi;
@@ -224,7 +242,18 @@ export function applySetWaveUniforms(material, setWave, schedule) {
   u.setWaveK.value = setWave.k;
   u.setWaveWidth.value = setWave.width;
   u.setWaveCrestAlong.value = setWave.crestAlong;
+  u.setWaveBuoyAlong.value = schedule?.buoyAlong ?? 0;
   u.setWaveDirection.value.set(setWave.dir.x, setWave.dir.y);
+  if (schedule?.polyline?.length && u.breakLinePts && u.breakLineCount) {
+    const bl = breakLineUniforms(schedule.polyline);
+    u.breakLineCount.value = bl.count;
+    for (let i = 0; i < MAX_BREAK_LINE_VERTS; i++) {
+      const p = bl.points[i];
+      u.breakLinePts.value[i].set(p.x, p.z);
+    }
+  } else if (u.breakLineCount) {
+    u.breakLineCount.value = 0;
+  }
   const duck =
     setWave.kind === 'set'
       ? THREE.MathUtils.lerp(1, 0.15, setWave.active)
