@@ -8,6 +8,7 @@ import {
   createPerfMonitor,
   verifyBootBudget,
 } from './boot-budget.js';
+import { createLayerPanel, verifyLayerControls } from './layer-controls.js';
 import {
   MAVERICKS_VIEWS,
   loadMavericksTerrain,
@@ -81,6 +82,7 @@ export async function bootLandAsset(mount, params) {
   } catch (error) {
     console.warn('[sounding] HDRI skipped', error);
   }
+  const hdriEnv = scene.environment;
 
   const terrain = await loadMavericksTerrain();
   scene.add(terrain.group);
@@ -130,6 +132,43 @@ export async function bootLandAsset(mount, params) {
     }
   };
 
+  const layerPanel = createLayerPanel({
+    params,
+    layers: [
+      {
+        id: 'terrain',
+        label: 'Terrain mesh',
+        group: 'stage',
+        apply: (on) => {
+          terrain.group.visible = on;
+        },
+      },
+      {
+        id: 'hdri',
+        label: 'HDRI IBL',
+        group: 'stage',
+        apply: (on) => {
+          scene.environment = on ? hdriEnv : null;
+        },
+      },
+      {
+        id: 'sun',
+        label: 'Sun + fill',
+        group: 'stage',
+        apply: (on) => {
+          sun.visible = on;
+          scene.children.forEach((child) => {
+            if (child.isAmbientLight || child.isHemisphereLight) {
+              child.visible = on;
+            }
+          });
+        },
+      },
+    ],
+  });
+  console.info('[mavericks] layer controls (land)', verifyLayerControls());
+  console.info('[mavericks] layer panel (land)', layerPanel.snapshot());
+
   window.__soundingLand = {
     setView,
     views: Object.keys(stageViews),
@@ -142,6 +181,7 @@ export async function bootLandAsset(mount, params) {
     perf: null,
     bootVerify: verifyBootBudget(bootBudget.snapshot()),
     ready: false,
+    layers: layerPanel,
   };
   window.__soundingBoot = window.__soundingLand;
   console.info('[mavericks] boot budget (land)', window.__soundingBoot.budget);
@@ -193,6 +233,7 @@ export async function bootLandAsset(mount, params) {
       window.removeEventListener('resize', onResize);
       delete window.__soundingLand;
       delete window.__soundingBoot;
+      layerPanel.dispose();
       terrain.dispose();
       renderer.dispose();
       mount.replaceChildren();

@@ -4,6 +4,7 @@
  */
 import * as THREE from 'three';
 import { createBootBudget, createPerfMonitor, verifyBootBudget } from './boot-budget.js';
+import { createLayerPanel, verifyLayerControls } from './layer-controls.js';
 import { SpectralOceanSystem } from '../ocean/ocean-system.js';
 import {
   createOceanMaterial,
@@ -252,6 +253,7 @@ export async function bootSeaStage(mount, params) {
   } catch (error) {
     console.warn('[sounding] environment failed', error);
   }
+  const hdriEnv = scene.environment;
 
   /** @type {Awaited<ReturnType<typeof loadMavericksTerrain>> | null} */
   let terrain = null;
@@ -321,6 +323,8 @@ export async function bootSeaStage(mount, params) {
   console.info('[mavericks] foam QA', foamQa);
   const bootVerify = verifyBootBudget(bootBudget.snapshot());
   console.info('[mavericks] boot budget (pre-tick)', bootVerify);
+  const layerVerify = verifyLayerControls();
+  console.info('[mavericks] layer controls', layerVerify);
 
   const publishBootState = () => {
     const budget = bootBudget.snapshot();
@@ -412,6 +416,132 @@ export async function bootSeaStage(mount, params) {
     refreshOverlay(lastSetWave, lastEta);
   };
 
+  const debugParam = params.get('debug');
+  if (debugParam != null && debugParam !== 'perf') {
+    oceanMaterial.uniforms.debugMode.value = Number(debugParam) || 0;
+  }
+
+  const storedFoamScale = oceanMaterial.uniforms.foamScale.value;
+  const storedDetailStrength = oceanMaterial.uniforms.detailStrength.value;
+  const storedSwell1 = oceanMaterial.uniforms.swellAmplitude.value;
+  const storedSwell2 = oceanMaterial.uniforms.swell2Amplitude.value;
+  const layerFlags = { fft: true, setWave: true, spray: true };
+
+  const layerPanel = createLayerPanel({
+    params,
+    onShaderMode: (mode) => {
+      oceanMaterial.uniforms.debugMode.value = mode;
+    },
+    layers: [
+      {
+        id: 'terrain',
+        label: 'Terrain mesh',
+        group: 'stage',
+        apply: (on) => {
+          if (terrain) terrain.group.visible = on;
+        },
+      },
+      {
+        id: 'buoy',
+        label: 'Buoy',
+        group: 'stage',
+        apply: (on) => {
+          if (buoy) buoy.group.visible = on;
+        },
+      },
+      {
+        id: 'spray',
+        label: 'Spray',
+        group: 'stage',
+        apply: (on) => {
+          layerFlags.spray = on;
+        },
+      },
+      {
+        id: 'sky',
+        label: 'Sky',
+        group: 'stage',
+        apply: (on) => {
+          sky.visible = on;
+        },
+      },
+      {
+        id: 'hdri',
+        label: 'HDRI IBL',
+        group: 'stage',
+        apply: (on) => {
+          scene.environment = on ? hdriEnv : null;
+        },
+      },
+      {
+        id: 'sun',
+        label: 'Sun',
+        group: 'stage',
+        apply: (on) => {
+          sun.visible = on;
+        },
+      },
+      {
+        id: 'ocean',
+        label: 'Ocean mesh',
+        group: 'ocean',
+        apply: (on) => {
+          oceanMesh.visible = on;
+        },
+      },
+      {
+        id: 'fft',
+        label: 'FFT cascade',
+        group: 'ocean',
+        apply: (on) => {
+          layerFlags.fft = on;
+        },
+      },
+      {
+        id: 'swell',
+        label: 'Background swell',
+        group: 'ocean',
+        apply: (on) => {
+          oceanMaterial.uniforms.swellAmplitude.value = on ? storedSwell1 : 0;
+          oceanMaterial.uniforms.swell2Amplitude.value = on ? storedSwell2 : 0;
+        },
+      },
+      {
+        id: 'set-wave',
+        label: 'Set-wave overlay',
+        group: 'ocean',
+        apply: (on) => {
+          layerFlags.setWave = on;
+        },
+      },
+      {
+        id: 'shoreline',
+        label: 'Shoreline clip',
+        group: 'ocean',
+        apply: (on) => {
+          oceanMaterial.uniforms.demClipEnabled.value = on && dem ? 1 : 0;
+        },
+      },
+      {
+        id: 'foam',
+        label: 'Foam',
+        group: 'ocean',
+        apply: (on) => {
+          oceanMaterial.uniforms.foamScale.value = on ? storedFoamScale : 0;
+        },
+      },
+      {
+        id: 'detail',
+        label: 'Detail chop',
+        group: 'ocean',
+        apply: (on) => {
+          oceanMaterial.uniforms.detailStrength.value = on ? storedDetailStrength : 0;
+        },
+      },
+    ],
+  });
+  console.info('[mavericks] layer panel', layerPanel.snapshot());
+
   window.__soundingSea = {
     setView,
     views: Object.keys(stageViews),
@@ -447,6 +577,7 @@ export async function bootSeaStage(mount, params) {
     mslY,
     buoyXz,
     ready: false,
+    layers: layerPanel,
   };
   window.__soundingBoot = window.__soundingSea;
   console.info('[mavericks] boot budget', window.__soundingBoot.budget);
@@ -464,11 +595,6 @@ export async function bootSeaStage(mount, params) {
     renderer.setSize(width, height, false);
   };
   window.addEventListener('resize', onResize);
-
-  const debugParam = params.get('debug');
-  if (debugParam != null) {
-    oceanMaterial.uniforms.debugMode.value = Number(debugParam) || 0;
-  }
 
   let alignmentChecks = 0;
   const maxAlignmentChecks = 120;
@@ -498,7 +624,18 @@ export async function bootSeaStage(mount, params) {
     }
 
     const setWave = sampleSetWave(setWaveSchedule, elapsed);
-    applySetWaveUniforms(oceanMaterial, setWave, setWaveSchedule);
+    if (layerFlags.setWave) {
+      applySetWaveUniforms(oceanMaterial, setWave, setWaveSchedule);
+    } else {
+      applySetWaveUniforms(
+        oceanMaterial,
+        { ...setWave, active: 0, amplitude: 0 },
+        setWaveSchedule,
+      );
+    }
+    if (!layerFlags.fft) {
+      oceanMaterial.uniforms.cascadeScale.value = 0;
+    }
     const shoreLevel = updateShoreWash(shoreWashState, setWave, dt);
     const reefLevel = updateReefWash(reefWashState, setWave, dt);
     oceanMaterial.uniforms.shoreWash.value = shoreLevel;
@@ -527,8 +664,10 @@ export async function bootSeaStage(mount, params) {
       );
     }
 
-    oceanSystem.update(elapsed, dt);
-    updateOceanMaterialTextures(oceanMaterial, oceanSystem.cascades);
+    if (layerFlags.fft) {
+      oceanSystem.update(elapsed, dt);
+      updateOceanMaterialTextures(oceanMaterial, oceanSystem.cascades);
+    }
     oceanMaterial.uniforms.time.value = elapsed;
 
     const gpuDisp = surfaceProbe.sample(
@@ -589,7 +728,9 @@ export async function bootSeaStage(mount, params) {
       buoy.group.position.y = mslY + buoy.dynamics.heave;
     }
 
-    const sprayLevel = updateSprayLevel(sprayState, setWave, dt, eta);
+    const sprayLevel = layerFlags.spray
+      ? updateSprayLevel(sprayState, setWave, dt, eta)
+      : 0;
     if (buoySpray) {
       buoySpray.update({ level: sprayLevel, dt, camera });
     }
@@ -617,6 +758,7 @@ export async function bootSeaStage(mount, params) {
       window.removeEventListener('resize', onResize);
       delete window.__soundingSea;
       delete window.__soundingBoot;
+      layerPanel.dispose();
       oceanGeometry.dispose();
       oceanMaterial.dispose();
       sky.geometry.dispose();
