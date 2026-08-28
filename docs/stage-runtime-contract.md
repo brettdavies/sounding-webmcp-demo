@@ -60,15 +60,15 @@ If a slice regresses a prior gate, **stop**, revert or fix, re-capture, and reco
 
 No query param required for the complete demo.
 
-### Current baseline (`d0f7805`)
+### Current baseline (P3 default boot)
 
-| URL          | Actual boot today                                                                   |
-| ------------ | ----------------------------------------------------------------------------------- |
-| *(none)*     | Land-only (`land-asset-boot.js`) — DEM, no ocean                                    |
-| `?focus=sea` | Full stage (`ocean-boot-sea.js`) — DEM + background swell + set-wave overlay + buoy |
+| URL           | Actual boot today                                                        |
+| ------------- | ------------------------------------------------------------------------ |
+| *(none)*      | Full stage (`ocean-boot-sea.js`) — DEM + ocean + set-wave overlay + buoy |
+| `?focus=land` | Land-only (`land-asset-boot.js`) — DEM terrain QA without ocean FFT      |
+| `?focus=sea`  | Full stage (legacy alias during transition)                              |
 
-Flipping default to full stage is a **backlog item** (see [`stage-backlog.md`](stage-backlog.md) P3). Until then, QA and
-captures for the integrated demo use `?focus=sea`.
+Integrated QA and captures may use bare URL or `?focus=sea`.
 
 ### `?focus` (target semantics)
 

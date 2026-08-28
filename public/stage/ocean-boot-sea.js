@@ -1,6 +1,7 @@
 /**
  * Full sea stage on USGS DEM land: spectral ocean at MHHW, set waves at break peak.
- * Loaded with ?focus=sea. Optional ?view=spectators|fallaway|reef|…
+ * Full sea stage on USGS DEM land: spectral ocean at MHHW, set waves at break peak.
+ * Default boot path (bare URL). Legacy alias: ?focus=sea. Land-only: ?focus=land.
  */
 import * as THREE from 'three';
 import { SpectralOceanSystem } from '../ocean/ocean-system.js';

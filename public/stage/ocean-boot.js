@@ -1,7 +1,10 @@
 /**
- * Stage boot — Mavericks land asset by default; ?focus=sea for ocean+buoy.
+ * Stage boot — full Mavericks stage by default; ?focus=land for terrain-only QA.
  */
 import { bootLandAsset } from './land-asset-boot.js';
+import { resolveBootMode } from './boot-mode.js';
+
+export { resolveBootMode } from './boot-mode.js';
 
 /**
  * @param {HTMLElement} mount
@@ -9,9 +12,10 @@ import { bootLandAsset } from './land-asset-boot.js';
  */
 export async function bootOceanStage(mount) {
   const params = new URLSearchParams(window.location.search);
-  if (params.get('focus') === 'sea') {
-    const mod = await import('./ocean-boot-sea.js');
-    return mod.bootSeaStage(mount, params);
+  const focus = params.get('focus');
+  if (focus === 'land') {
+    return bootLandAsset(mount, params);
   }
-  return bootLandAsset(mount, params);
+  const mod = await import('./ocean-boot-sea.js');
+  return mod.bootSeaStage(mount, params);
 }

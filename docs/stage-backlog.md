@@ -65,7 +65,7 @@ One evidence-gated commit; no behavior change — rename only. Update glossary
 
 ### P3 — Boot, default URL, debug UI, 120 fps
 
-- [ ] **Default boot = full stage** (invert current land/sea split)
+- [x] **Default boot = full stage** (invert current land/sea split)
 - [ ] `boot-budget.js` marks; `window.__soundingBoot`
 - [ ] Layer panel (`layer-controls.js`); URL + runtime toggles
 - [ ] Placeholder-first path <100 ms verified
