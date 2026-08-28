@@ -295,6 +295,15 @@ export function createOceanMaterial(cascades, options) {
       ),
     },
     shoreRadius: { value: options.shoreRadius ?? 130 },
+    reefWash: { value: 0 },
+    reefPeak: {
+      value: new THREE.Vector2(
+        options.reefPeak?.x ?? -440,
+        options.reefPeak?.z ?? -20,
+      ),
+    },
+    reefRadius: { value: options.reefRadius ?? 210 },
+    stillWaterY: { value: options.stillWaterY ?? 1.719 },
   };
 
   const setWaveGerstnerGlsl = `
@@ -333,6 +342,10 @@ export function createOceanMaterial(cascades, options) {
       uniform float shoreWash;
       uniform vec2 shoreCenter;
       uniform float shoreRadius;
+      uniform float reefWash;
+      uniform vec2 reefPeak;
+      uniform float reefRadius;
+      uniform float stillWaterY;
 
       float sampleDemHeight(vec2 xz) {
         float col = (xz.x + demParams.x) / demParams.y;
@@ -351,6 +364,15 @@ export function createOceanMaterial(cascades, options) {
         float margin = waterY - terrainY;
         float shallow = smoothstep(-0.5, 2.8, margin);
         return zone * shallow;
+      }
+
+      float reefZoneMask(vec2 xz) {
+        float dist = length(xz - reefPeak);
+        float zone = 1.0 - smoothstep(reefRadius * 0.28, reefRadius, dist);
+        float terrainY = sampleDemHeight(xz);
+        float elevBand =
+          smoothstep(-7.5, -5.0, terrainY) * (1.0 - smoothstep(-2.0, 0.5, terrainY));
+        return zone * elevBand;
       }
   `;
 
@@ -496,13 +518,20 @@ export function createOceanMaterial(cascades, options) {
         float foamRaw =
           clamp((foamThreshold - displacementA.a) * foamScale, 0.0, 1.0) +
           clamp((foamThreshold - displacementB.a) * foamScale, 0.0, 1.0);
-        float cascadeFoam = foamRaw;
+        float cascadeHistory = min(displacementA.a, displacementB.a);
+        float reefMask = reefZoneMask(oceanPosition);
+        float reefCascade =
+          foamRaw * (0.28 + 0.72 * cascadeHistory) * reefMask * reefWash;
+        float cascadeFoam = foamRaw * (1.0 - reefMask * 0.88);
         float lipJacobian = setWaveLipJacobian(oceanPosition);
         float lipFoam =
           lipJacobian *
           smoothstep(2.0, 11.0, setWaveHeightVarying) *
-          0.92;
-        float tubeLip = setWaveTubeLipRing(oceanPosition) * lipJacobian * 1.35;
+          0.92 *
+          reefMask *
+          max(reefWash, setWaveActive * 0.35);
+        float tubeLip =
+          setWaveTubeLipRing(oceanPosition) * lipJacobian * 1.35 * reefMask;
         float setWaveFoam =
           smoothstep(4.0, 12.0, setWaveHeightVarying) * setWaveActive * 0.35;
         float shoreFoam =
@@ -510,7 +539,7 @@ export function createOceanMaterial(cascades, options) {
         float foamCoverage = smoothstep(
           0.12,
           0.88,
-          cascadeFoam + lipFoam + tubeLip + setWaveFoam + shoreFoam
+          reefCascade + cascadeFoam + lipFoam + tubeLip + setWaveFoam + shoreFoam
         );
 
         if (debugMode == 1) {
@@ -556,6 +585,15 @@ export function createOceanMaterial(cascades, options) {
           float shoreMask = shoreWhitewashMask(oceanPosition, worldPositionVarying.y);
           outputColor = vec4(
             mix(vec3(0.04, 0.12, 0.2), vec3(0.95, 0.98, 1.0), clamp(shoreWash * shoreMask, 0.0, 1.0)),
+            1.0
+          );
+          return;
+        }
+        if (debugMode == 7) {
+          float reefMaskDbg = reefZoneMask(oceanPosition);
+          float reefShow = clamp((reefCascade + lipFoam + tubeLip) * reefMaskDbg, 0.0, 1.0);
+          outputColor = vec4(
+            mix(vec3(0.04, 0.12, 0.2), vec3(0.95, 0.98, 1.0), reefShow),
             1.0
           );
           return;

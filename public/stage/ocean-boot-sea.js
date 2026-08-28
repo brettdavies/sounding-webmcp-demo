@@ -39,6 +39,12 @@ import {
   verifyShoreWhitewash,
   SHORE_RADIUS_M,
 } from './shore-whitewash.js';
+import {
+  reefWhitewashComposite,
+  updateReefWash,
+  verifyReefWhitewash,
+  REEF_RADIUS_M,
+} from './reef-whitewash.js';
 import { loadEnvironment } from './land.js';
 import {
   MAVERICKS_VIEWS,
@@ -168,6 +174,7 @@ export async function bootSeaStage(mount, params) {
 
   const detailTexture = createOceanDetailTexture(512, MAVERICKS_SEA.seed);
   const shoreCenter = pins.spectators ?? { x: -100, z: 100 };
+  const reefPeak = pins.breakPeak ?? { x: -440, z: -20 };
   const oceanMaterial = createOceanMaterial(oceanSystem.cascades, {
     patchLengths: MAVERICKS_SEA.patchLengths,
     sunDirection,
@@ -176,6 +183,9 @@ export async function bootSeaStage(mount, params) {
     shorelineBias: 0.08,
     shoreCenter,
     shoreRadius: SHORE_RADIUS_M,
+    reefPeak,
+    reefRadius: REEF_RADIUS_M,
+    stillWaterY: mslY,
   });
   oceanMaterial.uniforms.foamScale.value = 0.7;
   oceanMaterial.uniforms.foamThreshold.value = 0.2;
@@ -281,6 +291,8 @@ export async function bootSeaStage(mount, params) {
   console.info('[mavericks] break styles', breakStyles);
   const shoreWhitewash = verifyShoreWhitewash(shoreCenter);
   console.info('[mavericks] shore whitewash', shoreWhitewash);
+  const reefWhitewash = verifyReefWhitewash(reefPeak);
+  console.info('[mavericks] reef whitewash', reefWhitewash);
   const openerPeak = sampleSetWave(setWaveSchedule, 4);
   const overlayVerify = {
     ok:
@@ -381,7 +393,9 @@ export async function bootSeaStage(mount, params) {
     }),
     overlayVerify,
     shoreWhitewash,
+    reefWhitewash,
     shoreWash: { level: 0, center: shoreCenter },
+    reefWash: { level: 0, peak: reefPeak },
     view: currentView,
     setWave: lastSetWave,
     mslY,
@@ -412,6 +426,7 @@ export async function bootSeaStage(mount, params) {
   let alignmentChecks = 0;
   const maxAlignmentChecks = 120;
   const shoreWashState = { level: 0 };
+  const reefWashState = { level: 0 };
 
   const tick = (ts) => {
     if (disposed) return;
@@ -423,18 +438,31 @@ export async function bootSeaStage(mount, params) {
     const setWave = sampleSetWave(setWaveSchedule, elapsed);
     applySetWaveUniforms(oceanMaterial, setWave, setWaveSchedule);
     const shoreLevel = updateShoreWash(shoreWashState, setWave, dt);
+    const reefLevel = updateReefWash(reefWashState, setWave, dt);
     oceanMaterial.uniforms.shoreWash.value = shoreLevel;
+    oceanMaterial.uniforms.reefWash.value = reefLevel;
     if (window.__soundingSea) {
-      window.__soundingSea.lipFoam = lipFoamCompositeAt(
+      const lip = lipFoamCompositeAt(
         setWave,
         buoyXz.x,
         buoyXz.z,
         setWaveSchedule,
       );
+      window.__soundingSea.lipFoam = lip;
       window.__soundingSea.shoreWash = {
         level: Number(shoreLevel.toFixed(4)),
         center: shoreCenter,
       };
+      window.__soundingSea.reefWash = {
+        level: Number(reefLevel.toFixed(4)),
+        peak: reefPeak,
+      };
+      window.__soundingSea.reefFoam = reefWhitewashComposite(
+        0.55,
+        lip.lipJ,
+        reefWhitewash.reefMask,
+        reefLevel,
+      );
     }
 
     oceanSystem.update(elapsed, dt);
