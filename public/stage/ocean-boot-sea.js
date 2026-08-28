@@ -1,9 +1,9 @@
 /**
  * Full sea stage on USGS DEM land: spectral ocean at MHHW, set waves at break peak.
- * Full sea stage on USGS DEM land: spectral ocean at MHHW, set waves at break peak.
  * Default boot path (bare URL). Legacy alias: ?focus=sea. Land-only: ?focus=land.
  */
 import * as THREE from 'three';
+import { createBootBudget, createPerfMonitor, verifyBootBudget } from './boot-budget.js';
 import { SpectralOceanSystem } from '../ocean/ocean-system.js';
 import {
   createOceanMaterial,
@@ -84,6 +84,8 @@ import {
  * @param {URLSearchParams} params
  */
 export async function bootSeaStage(mount, params) {
+  const bootBudget = createBootBudget({ mode: 'sea' });
+  const perfMonitor = params.get('debug') === 'perf' ? createPerfMonitor() : null;
   /** @type {Awaited<ReturnType<typeof loadMavericksMeta>> | null} */
   let metaBundle = null;
   try {
@@ -152,6 +154,7 @@ export async function bootSeaStage(mount, params) {
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   renderer.toneMappingExposure = 1.15;
   mount.replaceChildren(renderer.domElement);
+  bootBudget.mark('rendererReady');
 
   const scene = new THREE.Scene();
 
@@ -220,8 +223,12 @@ export async function bootSeaStage(mount, params) {
   sky.frustumCulled = false;
   scene.add(sky);
 
+  renderer.render(scene, camera);
+  bootBudget.mark('firstFrame');
+
   oceanMaterial.uniforms.sunDirection.value.copy(sunDirection);
   skyMaterial.uniforms.sunDirection.value.copy(sunDirection);
+  bootBudget.mark('sceneReady');
 
   const surfaceProbe = new SurfaceProbe(renderer, MAVERICKS_SEA.patchLengths);
   /** @deprecated cascade-only probe kept for regression compare during alignment QA */
@@ -235,6 +242,7 @@ export async function bootSeaStage(mount, params) {
     buoy = await loadBuoy();
     scene.add(buoy.group);
     buoySpray = attachBuoySpray(buoy.group);
+    bootBudget.mark('buoyReady');
   } catch (error) {
     console.warn('[sounding] buoy load failed', error);
   }
@@ -250,6 +258,7 @@ export async function bootSeaStage(mount, params) {
   try {
     terrain = await loadMavericksTerrain(metaBundle?.meta, demHeights ?? undefined);
     scene.add(terrain.group);
+    bootBudget.mark('terrainReady');
   } catch (error) {
     console.warn('[sounding] DEM terrain failed', error);
   }
@@ -310,6 +319,20 @@ export async function bootSeaStage(mount, params) {
     breakPeak: reefPeak,
   });
   console.info('[mavericks] foam QA', foamQa);
+  const bootVerify = verifyBootBudget(bootBudget.snapshot());
+  console.info('[mavericks] boot budget (pre-tick)', bootVerify);
+
+  const publishBootState = () => {
+    const budget = bootBudget.snapshot();
+    const verify = verifyBootBudget(budget);
+    const perf = perfMonitor?.snapshot() ?? null;
+    if (window.__soundingSea) {
+      window.__soundingSea.budget = budget;
+      window.__soundingSea.perf = perf;
+      window.__soundingSea.bootVerify = verify;
+      window.__soundingSea.ready = budget.fullyReadyMs != null;
+    }
+  };
   const openerPeak = sampleSetWave(setWaveSchedule, 4);
   const overlayVerify = {
     ok:
@@ -416,6 +439,9 @@ export async function bootSeaStage(mount, params) {
     shoreWash: { level: 0, center: shoreCenter },
     reefWash: { level: 0, peak: reefPeak },
     spray: { level: 0 },
+    budget: bootBudget.snapshot(),
+    perf: perfMonitor ? perfMonitor.snapshot() : null,
+    bootVerify,
     view: currentView,
     setWave: lastSetWave,
     mslY,
@@ -423,6 +449,7 @@ export async function bootSeaStage(mount, params) {
     ready: false,
   };
   window.__soundingBoot = window.__soundingSea;
+  console.info('[mavericks] boot budget', window.__soundingBoot.budget);
   refreshOverlay(lastSetWave, 0);
 
   let lastTs = performance.now();
@@ -448,6 +475,7 @@ export async function bootSeaStage(mount, params) {
   const shoreWashState = { level: 0 };
   const reefWashState = { level: 0 };
   const sprayState = { level: 0 };
+  let bootSettled = false;
 
   const tick = (ts) => {
     if (disposed) return;
@@ -455,6 +483,19 @@ export async function bootSeaStage(mount, params) {
     const dt = Math.min((ts - lastTs) / 1000, 0.05);
     lastTs = ts;
     elapsed += dt;
+
+    if (!bootSettled) {
+      bootBudget.mark('fullyReady');
+      bootSettled = true;
+      publishBootState();
+      console.info('[mavericks] boot budget (settled)', window.__soundingBoot?.bootVerify);
+    }
+    if (perfMonitor) {
+      perfMonitor.tick(dt);
+      if (window.__soundingSea) {
+        window.__soundingSea.perf = perfMonitor.snapshot();
+      }
+    }
 
     const setWave = sampleSetWave(setWaveSchedule, elapsed);
     applySetWaveUniforms(oceanMaterial, setWave, setWaveSchedule);
@@ -575,6 +616,7 @@ export async function bootSeaStage(mount, params) {
       cancelAnimationFrame(frameId);
       window.removeEventListener('resize', onResize);
       delete window.__soundingSea;
+      delete window.__soundingBoot;
       oceanGeometry.dispose();
       oceanMaterial.dispose();
       sky.geometry.dispose();

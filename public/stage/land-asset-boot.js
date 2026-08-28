@@ -4,6 +4,11 @@
 import * as THREE from 'three';
 import { RGBELoader } from 'three/addons/loaders/RGBELoader.js';
 import {
+  createBootBudget,
+  createPerfMonitor,
+  verifyBootBudget,
+} from './boot-budget.js';
+import {
   MAVERICKS_VIEWS,
   loadMavericksTerrain,
 } from './mavericks-terrain.js';
@@ -16,6 +21,9 @@ import { landOverlayReadout } from './overlay-readout.js';
  * @param {URLSearchParams} params
  */
 export async function bootLandAsset(mount, params) {
+  const bootBudget = createBootBudget({ mode: 'land' });
+  const perfMonitor = params.get('debug') === 'perf' ? createPerfMonitor() : null;
+
   // Default: fallaway — offshore hero (undersea + tip + radome).
   const viewName = params.get('view') || 'fallaway';
   const view = MAVERICKS_VIEWS[viewName] || MAVERICKS_VIEWS.fallaway;
@@ -32,6 +40,7 @@ export async function bootLandAsset(mount, params) {
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   mount.replaceChildren(renderer.domElement);
+  bootBudget.mark('rendererReady');
 
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(0x87a0b8);
@@ -75,6 +84,7 @@ export async function bootLandAsset(mount, params) {
 
   const terrain = await loadMavericksTerrain();
   scene.add(terrain.group);
+  bootBudget.mark('terrainReady');
   logPinSample(terrain.pins);
   logViewVerification(terrain.viewVerify);
   const stageViews = terrain.views;
@@ -128,10 +138,21 @@ export async function bootLandAsset(mount, params) {
     pins: terrain.pins,
     overlay: landReadout,
     view: currentView,
+    budget: bootBudget.snapshot(),
+    perf: null,
+    bootVerify: verifyBootBudget(bootBudget.snapshot()),
+    ready: false,
   };
+  window.__soundingBoot = window.__soundingLand;
+  console.info('[mavericks] boot budget (land)', window.__soundingBoot.budget);
+
+  renderer.render(scene, camera);
+  bootBudget.mark('firstFrame');
 
   let frameId = 0;
   let disposed = false;
+  let bootSettled = false;
+  let lastTs = performance.now();
   const onResize = () => {
     const w = mount.clientWidth;
     const h = Math.max(mount.clientHeight, 1);
@@ -141,9 +162,26 @@ export async function bootLandAsset(mount, params) {
   };
   window.addEventListener('resize', onResize);
 
-  const tick = () => {
+  const tick = (ts) => {
     if (disposed) return;
     frameId = requestAnimationFrame(tick);
+    const dt = Math.min((ts - lastTs) / 1000, 0.05);
+    lastTs = ts;
+
+    if (!bootSettled) {
+      bootBudget.mark('fullyReady');
+      bootSettled = true;
+      const budget = bootBudget.snapshot();
+      window.__soundingLand.budget = budget;
+      window.__soundingLand.bootVerify = verifyBootBudget(budget);
+      window.__soundingLand.ready = true;
+      console.info('[mavericks] boot budget (land settled)', window.__soundingLand.bootVerify);
+    }
+    if (perfMonitor) {
+      perfMonitor.tick(dt);
+      window.__soundingLand.perf = perfMonitor.snapshot();
+    }
+
     renderer.render(scene, camera);
   };
   requestAnimationFrame(tick);
@@ -154,6 +192,7 @@ export async function bootLandAsset(mount, params) {
       cancelAnimationFrame(frameId);
       window.removeEventListener('resize', onResize);
       delete window.__soundingLand;
+      delete window.__soundingBoot;
       terrain.dispose();
       renderer.dispose();
       mount.replaceChildren();
