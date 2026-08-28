@@ -61,6 +61,7 @@ import {
   applyOverlayReadout,
   overlayReadout,
 } from './overlay-readout.js';
+import { auditHeroViews } from './hero-views-runtime.js';
 import {
   updateShoreWash,
   verifyShoreWhitewash,
@@ -640,6 +641,7 @@ export async function bootSeaStage(mount, params) {
     qualityRamp: sampleQualityRamp(0),
     qualityRampVerify,
     perfGate: perfGate.snapshot(),
+    heroViewsAudit: () => auditHeroViews(setView, () => window.__soundingSea),
   };
   window.__soundingBoot = window.__soundingSea;
   console.info('[mavericks] boot budget', window.__soundingBoot.budget);

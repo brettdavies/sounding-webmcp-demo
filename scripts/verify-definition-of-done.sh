@@ -28,6 +28,7 @@ scripts=(
   verify-perf-gate
   verify-reading-alignment
   verify-ground-truth-locks
+  verify-hero-views-runtime
   verify-qa-manifest
   verify-capture-qa-manifest
 )

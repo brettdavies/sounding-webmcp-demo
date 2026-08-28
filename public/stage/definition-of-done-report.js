@@ -22,8 +22,8 @@ export const DEFINITION_OF_DONE_ITEMS = [
     id: 'views-mhhw',
     label: 'fallaway, reef, spectators pass visual QA at MHHW on default boot',
     kind: 'visual',
-    scripts: ['verify-mavericks-views', 'verify-default-boot'],
-    note: 'MHHW camera invariants verified; hero captures pending',
+    scripts: ['verify-mavericks-views', 'verify-default-boot', 'verify-hero-views-runtime'],
+    note: 'MHHW camera + runtime audit verified; hero captures pending',
   },
   {
     id: 'cliffs-steep',

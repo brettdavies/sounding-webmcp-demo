@@ -104,8 +104,8 @@ dropped in `public/models/`. Procedural stand-ins must not contradict ground tru
 
 ## Definition of done (demo “best”)
 
-- [ ] **fallaway**, **reef**, **spectators** pass visual QA at MHHW on **default boot** *(MHHW camera invariants
-  verified; hero captures pending)*
+- [ ] **fallaway**, **reef**, **spectators** pass visual QA at MHHW on **default boot** *(runtime audit green in
+  browser; hero captures pending)*
 - [x] Cliffs read **near-vertical** in hero views (not melted slopes)
 - [x] Set wave every **5–7 s within a set**; curved **crest line**; occasional tube on bombs
 - [x] Buoy tracks wave surface; never airborne

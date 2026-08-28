@@ -31,7 +31,8 @@
     "window.__soundingBoot.ready",
     "window.__soundingBoot.bootVerify.ok",
     "window.__soundingBoot.foamQa.ok",
-    "window.__soundingBoot.overlayVerify.ok"
+    "window.__soundingBoot.overlayVerify.ok",
+    "window.__soundingBoot.heroViewsAudit().ok"
   ],
   "verifyScripts": [
     "scripts/verify-default-boot.sh",
@@ -43,6 +44,7 @@
     "scripts/verify-foam-qa.sh",
     "scripts/verify-overlay-readout.sh",
     "scripts/verify-cliff-qa.sh",
+    "scripts/verify-hero-views-runtime.sh",
     "scripts/verify-terrain-stride.sh",
     "scripts/verify-qa-manifest.sh",
     "scripts/verify-capture-qa-manifest.sh"
