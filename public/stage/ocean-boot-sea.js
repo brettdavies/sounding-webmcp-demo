@@ -4,6 +4,10 @@
  */
 import * as THREE from 'three';
 import { createBootBudget, createPerfMonitor, verifyBootBudget } from './boot-budget.js';
+import {
+  verifyPlaceholderBoot,
+} from './boot-placeholder.js';
+import { createBootPlaceholder } from './boot-placeholder-stage.js';
 import { createLayerPanel, verifyLayerControls } from './layer-controls.js';
 import { SpectralOceanSystem } from '../ocean/ocean-system.js';
 import {
@@ -87,6 +91,81 @@ import {
 export async function bootSeaStage(mount, params) {
   const bootBudget = createBootBudget({ mode: 'sea' });
   const perfMonitor = params.get('debug') === 'perf' ? createPerfMonitor() : null;
+  const viewName = params.get('view') || 'fallaway';
+  let mslY = MSL_Y;
+  const view = MAVERICKS_VIEWS[viewName] || {
+    position: DESIGN_CAMERA.position,
+    lookAt: {
+      x: BREAK_PEAK.x,
+      y: DESIGN_CAMERA.lookAt.y,
+      z: BREAK_PEAK.z,
+    },
+    fov: DESIGN_CAMERA.fov,
+  };
+
+  const renderer = new THREE.WebGLRenderer({
+    antialias: true,
+    powerPreference: 'high-performance',
+  });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  renderer.setSize(mount.clientWidth, mount.clientHeight, false);
+  renderer.outputColorSpace = THREE.SRGBColorSpace;
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer.toneMappingExposure = 1.15;
+  mount.replaceChildren(renderer.domElement);
+  bootBudget.mark('rendererReady');
+
+  const scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x2a5b9c);
+
+  const camera = new THREE.PerspectiveCamera(
+    view.fov,
+    mount.clientWidth / Math.max(mount.clientHeight, 1),
+    DESIGN_CAMERA.near,
+    DESIGN_CAMERA.far,
+  );
+  camera.position.set(view.position.x, view.position.y, view.position.z);
+  camera.lookAt(view.lookAt.x, view.lookAt.y, view.lookAt.z);
+
+  const placeholder = createBootPlaceholder({ mslY });
+
+  renderer.render(scene, camera);
+  bootBudget.mark('firstFrame');
+
+  placeholder.attach(scene);
+  renderer.render(scene, camera);
+  bootBudget.mark('placeholderReady');
+  console.info('[mavericks] placeholder boot', verifyPlaceholderBoot(bootBudget.snapshot()));
+
+  const sunDirection = new THREE.Vector3(
+    SUN_DIRECTION.x,
+    SUN_DIRECTION.y,
+    SUN_DIRECTION.z,
+  ).normalize();
+
+  scene.add(new THREE.AmbientLight(0xb8c4d0, 0.45));
+  const sun = new THREE.DirectionalLight(0xfff1dc, 2.4);
+  sun.position.copy(sunDirection).multiplyScalar(400);
+  scene.add(sun);
+
+  const skyMaterial = createSkyMaterial({ sunDirection });
+  const sky = new THREE.Mesh(
+    new THREE.SphereGeometry(4200, 32, 16),
+    skyMaterial,
+  );
+  sky.frustumCulled = false;
+  scene.add(sky);
+  scene.background = null;
+
+  let placeholderSpinId = 0;
+  let placeholderActive = true;
+  const spinPlaceholder = () => {
+    if (!placeholderActive) return;
+    renderer.render(scene, camera);
+    placeholderSpinId = requestAnimationFrame(spinPlaceholder);
+  };
+  placeholderSpinId = requestAnimationFrame(spinPlaceholder);
+
   /** @type {Awaited<ReturnType<typeof loadMavericksMeta>> | null} */
   let metaBundle = null;
   try {
@@ -109,7 +188,9 @@ export async function bootSeaStage(mount, params) {
   if (viewBundle.report) {
     logViewVerification(viewBundle.report);
   }
-  const mslY = pins.mslY;
+  mslY = pins.mslY;
+  placeholder.ocean.position.y = mslY;
+  placeholder.terrain.position.y = mslY + 14;
 
   /** @type {ReturnType<typeof createDemHeightTexture> | null} */
   let dem = null;
@@ -133,51 +214,6 @@ export async function bootSeaStage(mount, params) {
       console.warn('[sounding] DEM shoreline clip failed', error);
     }
   }
-
-  const viewName = params.get('view') || 'fallaway';
-  const view = stageViews[viewName] || {
-    position: DESIGN_CAMERA.position,
-    lookAt: {
-      x: pins.breakPeak.x,
-      y: DESIGN_CAMERA.lookAt.y,
-      z: pins.breakPeak.z,
-    },
-    fov: DESIGN_CAMERA.fov,
-  };
-
-  const renderer = new THREE.WebGLRenderer({
-    antialias: true,
-    powerPreference: 'high-performance',
-  });
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
-  renderer.setSize(mount.clientWidth, mount.clientHeight, false);
-  renderer.outputColorSpace = THREE.SRGBColorSpace;
-  renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1.15;
-  mount.replaceChildren(renderer.domElement);
-  bootBudget.mark('rendererReady');
-
-  const scene = new THREE.Scene();
-
-  const camera = new THREE.PerspectiveCamera(
-    view.fov,
-    mount.clientWidth / Math.max(mount.clientHeight, 1),
-    DESIGN_CAMERA.near,
-    DESIGN_CAMERA.far,
-  );
-  camera.position.set(view.position.x, view.position.y, view.position.z);
-  camera.lookAt(view.lookAt.x, view.lookAt.y, view.lookAt.z);
-
-  const sunDirection = new THREE.Vector3(
-    SUN_DIRECTION.x,
-    SUN_DIRECTION.y,
-    SUN_DIRECTION.z,
-  ).normalize();
-
-  scene.add(new THREE.AmbientLight(0xb8c4d0, 0.45));
-  const sun = new THREE.DirectionalLight(0xfff1dc, 2.4);
-  sun.position.copy(sunDirection).multiplyScalar(400);
-  scene.add(sun);
 
   const oceanSystem = new SpectralOceanSystem(renderer, {
     ...MAVERICKS_SEA,
@@ -215,21 +251,14 @@ export async function bootSeaStage(mount, params) {
   oceanMesh.position.y = mslY;
   oceanMesh.frustumCulled = false;
   scene.add(oceanMesh);
-
-  const skyMaterial = createSkyMaterial({ sunDirection });
-  const sky = new THREE.Mesh(
-    new THREE.SphereGeometry(4200, 32, 16),
-    skyMaterial,
-  );
-  sky.frustumCulled = false;
-  scene.add(sky);
-
-  renderer.render(scene, camera);
-  bootBudget.mark('firstFrame');
+  placeholder.ocean.visible = false;
 
   oceanMaterial.uniforms.sunDirection.value.copy(sunDirection);
   skyMaterial.uniforms.sunDirection.value.copy(sunDirection);
   bootBudget.mark('sceneReady');
+  placeholder.detach(scene);
+  placeholder.dispose();
+  bootBudget.mark('placeholderSwap');
 
   const surfaceProbe = new SurfaceProbe(renderer, MAVERICKS_SEA.patchLengths);
   /** @deprecated cascade-only probe kept for regression compare during alignment QA */
@@ -578,6 +607,7 @@ export async function bootSeaStage(mount, params) {
     buoyXz,
     ready: false,
     layers: layerPanel,
+    placeholder: verifyPlaceholderBoot(bootBudget.snapshot()),
   };
   window.__soundingBoot = window.__soundingSea;
   console.info('[mavericks] boot budget', window.__soundingBoot.budget);
@@ -605,6 +635,10 @@ export async function bootSeaStage(mount, params) {
 
   const tick = (ts) => {
     if (disposed) return;
+    if (placeholderActive) {
+      placeholderActive = false;
+      cancelAnimationFrame(placeholderSpinId);
+    }
     frameId = requestAnimationFrame(tick);
     const dt = Math.min((ts - lastTs) / 1000, 0.05);
     lastTs = ts;
