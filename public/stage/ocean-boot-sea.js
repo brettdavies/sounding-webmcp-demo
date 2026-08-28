@@ -30,6 +30,10 @@ import {
   STAGE_BREAK_SEED,
 } from './break-style.js';
 import { lipFoamCompositeAt } from './lip-foam-jacobian.js';
+import {
+  applyOverlayReadout,
+  overlayReadout,
+} from './overlay-readout.js';
 import { loadEnvironment } from './land.js';
 import {
   MAVERICKS_VIEWS,
@@ -267,7 +271,71 @@ export async function bootSeaStage(mount, params) {
   );
   console.info('[mavericks] curved crest line', crestLine);
   console.info('[mavericks] break styles', breakStyles);
+  const openerPeak = sampleSetWave(setWaveSchedule, 4);
+  const overlayVerify = {
+    ok:
+      openerPeak.active > 0.2 &&
+      openerPeak.label === 'opener' &&
+      openerPeak.breakStyle === 'spill' &&
+      overlayReadout({
+        setWave: openerPeak,
+        viewName: 'reef',
+        eta: 8,
+        reading,
+      }).heat === 'heat · opener · spill · reef',
+    opener: {
+      label: openerPeak.label,
+      breakStyle: openerPeak.breakStyle,
+      active: Number(openerPeak.active.toFixed(3)),
+    },
+  };
+  console.info('[mavericks] overlay readout', overlayVerify);
   let currentView = viewName;
+
+  let elapsed = 0;
+  const loopParam = params.get('loop_t');
+  if (loopParam != null) {
+    const seek = Number(loopParam);
+    if (Number.isFinite(seek)) {
+      elapsed = ((seek % setWaveSchedule.loopSec) + setWaveSchedule.loopSec) %
+        setWaveSchedule.loopSec;
+    }
+  }
+
+  /** @param {string} name */
+  const syncViewUrl = (name) => {
+    try {
+      const url = new URL(window.location.href);
+      url.searchParams.set('view', name);
+      window.history.replaceState(null, '', url);
+    } catch (error) {
+      console.warn('[sounding] view URL sync failed', error);
+    }
+  };
+
+  /** @param {ReturnType<typeof sampleSetWave>} setWave */
+  let lastSetWave = sampleSetWave(setWaveSchedule, elapsed);
+  let lastEta = 0;
+
+  const overlayElements = { waveEl, asOfEl };
+
+  /** @param {ReturnType<typeof sampleSetWave>} setWave @param {number} eta */
+  const refreshOverlay = (setWave, eta) => {
+    lastSetWave = setWave;
+    lastEta = eta;
+    const readout = applyOverlayReadout(overlayElements, {
+      setWave,
+      viewName: currentView,
+      eta,
+      reading,
+    });
+    if (window.__soundingSea) {
+      window.__soundingSea.overlay = readout;
+      window.__soundingSea.view = currentView;
+      window.__soundingSea.setWave = setWave;
+    }
+    return readout;
+  };
 
   /** @param {string} name */
   const setView = (name) => {
@@ -278,6 +346,8 @@ export async function bootSeaStage(mount, params) {
     camera.updateProjectionMatrix();
     camera.position.set(v.position.x, v.position.y, v.position.z);
     camera.lookAt(v.lookAt.x, v.lookAt.y, v.lookAt.z);
+    syncViewUrl(name);
+    refreshOverlay(lastSetWave, lastEta);
   };
 
   window.__soundingSea = {
@@ -293,13 +363,22 @@ export async function bootSeaStage(mount, params) {
     crestLine,
     breakStyles,
     lipFoam: null,
+    overlay: overlayReadout({
+      setWave: lastSetWave,
+      viewName: currentView,
+      eta: lastEta,
+      reading,
+    }),
+    overlayVerify,
+    view: currentView,
+    setWave: lastSetWave,
     mslY,
     buoyXz,
     ready: false,
   };
   window.__soundingBoot = window.__soundingSea;
+  refreshOverlay(lastSetWave, 0);
 
-  let elapsed = 0;
   let lastTs = performance.now();
   let frameId = 0;
   let disposed = false;
@@ -408,30 +487,7 @@ export async function bootSeaStage(mount, params) {
           : Math.max(0.1, Math.abs(eta));
       metersEl.textContent = display.toFixed(1);
     }
-    if (waveEl) {
-      const faceM =
-        setWave.active > 0.08
-          ? setWave.face_m.toFixed(1)
-          : Math.abs(eta).toFixed(1);
-      const tag =
-        setWave.active > 0.08
-          ? setWave.kind === 'tween'
-            ? 'tween'
-            : setWave.label || 'face'
-          : 'swell';
-      const styleTag =
-        setWave.active > 0.08 && setWave.kind === 'set'
-          ? ` · ${setWave.breakStyle}`
-          : '';
-      waveEl.textContent = `${tag}${styleTag} ${faceM} m · ${setWave.periodS} s · ${setWave.directionDeg}° · ${currentView}`;
-    }
-    if (asOfEl && setWave.active > 0.2 && setWave.kind === 'set') {
-      asOfEl.textContent = `heat · ${setWave.label} · ${setWave.breakStyle}`;
-    } else if (asOfEl && setWave.active > 0.2 && setWave.kind === 'tween') {
-      asOfEl.textContent = `heat · smaller between`;
-    } else if (asOfEl && reading.as_of_local) {
-      asOfEl.textContent = reading.as_of_local;
-    }
+    refreshOverlay(setWave, eta);
 
     renderer.render(scene, camera);
   };

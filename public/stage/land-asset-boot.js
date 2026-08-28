@@ -9,6 +9,7 @@ import {
 } from './mavericks-terrain.js';
 import { logPinSample } from './mavericks-pins.js';
 import { logViewVerification } from './mavericks-views-verify.js';
+import { landOverlayReadout } from './overlay-readout.js';
 
 /**
  * @param {HTMLElement} mount
@@ -81,23 +82,42 @@ export async function bootLandAsset(mount, params) {
   const metersEl = document.getElementById('meters');
   const waveEl = document.getElementById('wave');
   const asOfEl = document.getElementById('as-of');
+  let currentView = viewName;
   if (metersEl) {
     metersEl.textContent = (terrain.meta.station_local?.y ?? 40).toFixed(0);
   }
-  if (waveEl) waveEl.textContent = `land · ${viewName}`;
-  if (asOfEl) {
-    asOfEl.textContent = 'USGS DS684 DEM · Pillar Point / Mavericks';
-  }
+  const landReadout = landOverlayReadout(currentView);
+  if (waveEl) waveEl.textContent = landReadout.wave;
+  if (asOfEl) asOfEl.textContent = landReadout.heat;
+
+  /** @param {string} name */
+  const syncViewUrl = (name) => {
+    try {
+      const url = new URL(window.location.href);
+      url.searchParams.set('view', name);
+      window.history.replaceState(null, '', url);
+    } catch (error) {
+      console.warn('[sounding] view URL sync failed', error);
+    }
+  };
 
   /** @param {string} name */
   const setView = (name) => {
     const v = stageViews[name];
     if (!v) return;
+    currentView = name;
     camera.fov = v.fov;
     camera.updateProjectionMatrix();
     camera.position.set(v.position.x, v.position.y, v.position.z);
     camera.lookAt(v.lookAt.x, v.lookAt.y, v.lookAt.z);
-    if (waveEl) waveEl.textContent = `land · ${name}`;
+    syncViewUrl(name);
+    const readout = landOverlayReadout(name);
+    if (waveEl) waveEl.textContent = readout.wave;
+    if (asOfEl) asOfEl.textContent = readout.heat;
+    if (window.__soundingLand) {
+      window.__soundingLand.overlay = readout;
+      window.__soundingLand.view = name;
+    }
   };
 
   window.__soundingLand = {
@@ -106,6 +126,8 @@ export async function bootLandAsset(mount, params) {
     camera,
     meta: terrain.meta,
     pins: terrain.pins,
+    overlay: landReadout,
+    view: currentView,
   };
 
   let frameId = 0;

@@ -48,7 +48,7 @@ One evidence-gated commit; no behavior change — rename only. Update glossary
 - [x] Curved crest along `break_line.polyline`
 - [x] Per-wave **break style** (spill / plunge / tube)
 - [x] Lip/foam Jacobian visible; tube read on bombs
-- [ ] Overlay view + wave tag consistent
+- [x] Overlay view + wave tag consistent
 
 ### P1b — Foam, spray, shore wash
 
