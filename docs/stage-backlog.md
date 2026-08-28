@@ -17,7 +17,7 @@ Phased implementation order, async user assets, and definition of done. Each sli
 - [ ] GPU displacement aligned with CPU buoy sample
 - [ ] All `MAVERICKS_VIEWS` verified at MHHW
 - [x] **Station / pillar XZ ↔ DEM elevation reconciled** (`meta.json` 2026-08-27)
-- [ ] Wire reconciled pins into `mavericks-terrain.js` views, `sea-state.js`, buoy mooring QA
+- [x] Wire reconciled pins into `mavericks-terrain.js` views, `sea-state.js`, buoy mooring QA
 - [ ] **Rename code to match [`stage-glossary.md`](stage-glossary.md)** — set-wave overlay vocabulary (see scope below)
 
 #### P0 — Glossary code rename (scope)

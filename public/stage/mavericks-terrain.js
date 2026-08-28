@@ -3,6 +3,7 @@
  * Albedo: NAIP 2022 ortho + Poly Haven cliff/rock bake. Cliff normals on steep faces.
  */
 import * as THREE from 'three';
+import { extractPins } from './mavericks-pins.js';
 
 /**
  * @typedef {{
@@ -69,11 +70,35 @@ export const MAVERICKS_VIEWS = Object.freeze({
   },
   /** Harbor-facing spectator beach on dry sand (above MHHW); eye ~2.5 m → break. */
   spectators: {
-    position: { x: -100, y: 5.5, z: -100 },
+    position: { x: -100, y: 5.5, z: 100 },
     lookAt: { x: -440, y: 6, z: -20 },
     fov: 50,
   },
 });
+
+/**
+ * Merge static camera rigs with reconciled pins from meta.json.
+ * @param {import('./mavericks-pins.js').MavericksPins | Record<string, unknown>} metaOrPins
+ */
+export function viewsForMeta(metaOrPins) {
+  const pins =
+    'breakPeak' in metaOrPins ? metaOrPins : extractPins(/** @type {Record<string, unknown>} */ (metaOrPins));
+  const spec = pins.spectators;
+  const peak = pins.breakPeak;
+  const views = { ...MAVERICKS_VIEWS };
+  if (spec) {
+    views.spectators = {
+      position: {
+        x: spec.x,
+        y: (spec.ground_y ?? 0) + (spec.eye_height_m ?? 2.5),
+        z: spec.z,
+      },
+      lookAt: spec.look_at ?? { x: peak.x, y: 6, z: peak.z },
+      fov: 50,
+    };
+  }
+  return Object.freeze(views);
+}
 
 /**
  * @param {string} url
@@ -90,16 +115,21 @@ async function loadTex(url, opts = {}) {
 }
 
 /**
+ * @param {Record<string, unknown>} [metaIn] Optional pre-fetched meta (avoids duplicate fetch).
  * @returns {Promise<{
  *   group: THREE.Group,
  *   meta: MavericksMeta,
+ *   pins: import('./mavericks-pins.js').MavericksPins,
+ *   views: ReturnType<typeof viewsForMeta>,
  *   dispose: () => void,
  * }>}
  */
-export async function loadMavericksTerrain() {
+export async function loadMavericksTerrain(metaIn) {
   const meta = /** @type {MavericksMeta} */ (
-    await fetch('/land/mavericks/meta.json').then((r) => r.json())
+    metaIn ?? (await fetch('/land/mavericks/meta.json').then((r) => r.json()))
   );
+  const pins = extractPins(/** @type {Record<string, unknown>} */ (meta));
+  const views = viewsForMeta(pins);
   const buf = await fetch('/land/mavericks/height.f32').then((r) =>
     r.arrayBuffer(),
   );
@@ -206,6 +236,8 @@ export async function loadMavericksTerrain() {
   return {
     group,
     meta,
+    pins,
+    views,
     dispose() {
       geo.dispose();
       mat.dispose();

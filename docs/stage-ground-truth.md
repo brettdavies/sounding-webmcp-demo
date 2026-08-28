@@ -202,7 +202,8 @@ Record attribution strings in commit messages or overlay credits when a Sketchfa
 | Break peak/poly  | unchanged          | on **−5…−6 m** reef    | already correct   |
 
 **Committed in `meta.json`.** Code still at baseline `d0f7805` — cameras (`MAVERICKS_VIEWS.station`, `spectators`,
-`cliff`) and `sea-state.js` `BREAK_ROCKS` still reference old coordinates until P0 implementation.
+`cliff`) and `sea-state.js` `BREAK_ROCKS` read from `mavericks-pins.js` fallbacks; runtime boot resolves via
+`extractPins(meta)`.
 
 ---
 

@@ -3,6 +3,7 @@
  * Mavericks: long-period Pacific swell — organized, not North-Atlantic chop.
  * Giant faces are the hybrid heat overlay; cascade is a quiet in-between sea.
  */
+import { PIN_FALLBACKS } from './mavericks-pins.js';
 
 /** @typedef {{
  *   directionDegrees: number,
@@ -57,18 +58,19 @@ export const SUN_DIRECTION = Object.freeze({
 
 /**
  * Still-water plane in DEM local meters (NAVD88).
- * Harbor datum lock: MLLW≈0.01, MSL≈0.92, MHHW≈1.72 (NOAA 9414131).
+ * Harbor datum lock: MLLW≈0.01, MSL≈0.92, MHHW≈1.719 (NOAA 9414131).
  * Stage seats at MHHW so Gerstner troughs don’t drain the cliff-toe shelf;
  * true MSL left a wide dry band at the west face.
  */
-export const MSL_Y = 1.72;
+export const MSL_Y = PIN_FALLBACKS.mslY;
 
 /**
  * Break focus from `meta.json` break_line (Pillar Point diagram + DEM −5…−6 m).
  * Faces crest through here; buoy moors on the reef peak.
+ * Runtime boot resolves from meta via `extractPins()`; these mirror meta fallbacks.
  */
-export const BREAK_PEAK = Object.freeze({ x: -440, z: -20 });
-export const BREAK_ROCKS = Object.freeze({ x: -338, z: 197 });
+export const BREAK_PEAK = PIN_FALLBACKS.breakPeak;
+export const BREAK_ROCKS = PIN_FALLBACKS.breakRocks;
 
 /**
  * Default sea camera: fallaway offshore, looking at the break peak.

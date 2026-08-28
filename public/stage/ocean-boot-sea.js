@@ -24,8 +24,14 @@ import { loadEnvironment } from './land.js';
 import {
   MAVERICKS_VIEWS,
   loadMavericksTerrain,
+  viewsForMeta,
 } from './mavericks-terrain.js';
 import {
+  loadMavericksMeta,
+  logPinSample,
+} from './mavericks-pins.js';
+import {
+  BREAK_PEAK,
   BUOY_XZ,
   DESIGN_CAMERA,
   MAVERICKS_SEA,
@@ -40,10 +46,32 @@ import {
  * @param {URLSearchParams} params
  */
 export async function bootSeaStage(mount, params) {
+  /** @type {Awaited<ReturnType<typeof loadMavericksMeta>> | null} */
+  let metaBundle = null;
+  try {
+    metaBundle = await loadMavericksMeta();
+    logPinSample(metaBundle.pins);
+  } catch (error) {
+    console.warn('[sounding] meta pins failed', error);
+  }
+
+  const pins = metaBundle?.pins ?? {
+    mslY: MSL_Y,
+    breakPeak: BREAK_PEAK,
+    buoyXz: BUOY_XZ,
+    swellFromDeg: MAVERICKS_SEA.swell.directionDegrees,
+  };
+  const stageViews = metaBundle ? viewsForMeta(metaBundle.pins) : MAVERICKS_VIEWS;
+  const mslY = pins.mslY;
+
   const viewName = params.get('view') || 'fallaway';
-  const view = MAVERICKS_VIEWS[viewName] || {
+  const view = stageViews[viewName] || {
     position: DESIGN_CAMERA.position,
-    lookAt: DESIGN_CAMERA.lookAt,
+    lookAt: {
+      x: pins.breakPeak.x,
+      y: DESIGN_CAMERA.lookAt.y,
+      z: pins.breakPeak.z,
+    },
     fov: DESIGN_CAMERA.fov,
   };
 
@@ -104,7 +132,7 @@ export async function bootSeaStage(mount, params) {
   );
   oceanGeometry.rotateX(-Math.PI / 2);
   const oceanMesh = new THREE.Mesh(oceanGeometry, oceanMaterial);
-  oceanMesh.position.y = MSL_Y;
+  oceanMesh.position.y = mslY;
   oceanMesh.frustumCulled = false;
   scene.add(oceanMesh);
 
@@ -139,18 +167,19 @@ export async function bootSeaStage(mount, params) {
   /** @type {Awaited<ReturnType<typeof loadMavericksTerrain>> | null} */
   let terrain = null;
   try {
-    terrain = await loadMavericksTerrain();
+    terrain = await loadMavericksTerrain(metaBundle?.meta);
     scene.add(terrain.group);
   } catch (error) {
     console.warn('[sounding] DEM terrain failed', error);
   }
 
-  const peak = terrain?.meta?.break_line?.peak ?? {
+  const peak = terrain?.pins?.breakPeak ?? pins.breakPeak ?? {
     x: BUOY_XZ.x,
     z: BUOY_XZ.z,
   };
   const buoyXz = { x: peak.x, z: peak.z };
   const swellFrom =
+    terrain?.pins?.swellFromDeg ??
     terrain?.meta?.break_line?.swell_from_deg ??
     MAVERICKS_SEA.swell.directionDegrees;
 
@@ -174,7 +203,7 @@ export async function bootSeaStage(mount, params) {
 
   /** @param {string} name */
   const setView = (name) => {
-    const v = MAVERICKS_VIEWS[name];
+    const v = stageViews[name];
     if (!v) return;
     currentView = name;
     camera.fov = v.fov;
@@ -185,13 +214,15 @@ export async function bootSeaStage(mount, params) {
 
   window.__soundingSea = {
     setView,
-    views: Object.keys(MAVERICKS_VIEWS),
+    views: Object.keys(stageViews),
     camera,
-    meta: terrain?.meta ?? null,
-    mslY: MSL_Y,
+    meta: terrain?.meta ?? metaBundle?.meta ?? null,
+    pins: terrain?.pins ?? metaBundle?.pins ?? null,
+    mslY,
     buoyXz,
     ready: false,
   };
+  window.__soundingBoot = window.__soundingSea;
 
   let elapsed = 0;
   let lastTs = performance.now();
@@ -254,7 +285,7 @@ export async function bootSeaStage(mount, params) {
         moorZ: buoyXz.z,
       });
       buoy.applyDynamics();
-      buoy.group.position.y = MSL_Y + buoy.dynamics.heave;
+      buoy.group.position.y = mslY + buoy.dynamics.heave;
     }
 
     if (metersEl) {

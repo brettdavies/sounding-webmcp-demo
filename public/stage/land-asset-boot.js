@@ -7,6 +7,7 @@ import {
   MAVERICKS_VIEWS,
   loadMavericksTerrain,
 } from './mavericks-terrain.js';
+import { logPinSample } from './mavericks-pins.js';
 
 /**
  * @param {HTMLElement} mount
@@ -72,6 +73,8 @@ export async function bootLandAsset(mount, params) {
 
   const terrain = await loadMavericksTerrain();
   scene.add(terrain.group);
+  logPinSample(terrain.pins);
+  const stageViews = terrain.views;
 
   const metersEl = document.getElementById('meters');
   const waveEl = document.getElementById('wave');
@@ -86,7 +89,7 @@ export async function bootLandAsset(mount, params) {
 
   /** @param {string} name */
   const setView = (name) => {
-    const v = MAVERICKS_VIEWS[name];
+    const v = stageViews[name];
     if (!v) return;
     camera.fov = v.fov;
     camera.updateProjectionMatrix();
@@ -97,9 +100,10 @@ export async function bootLandAsset(mount, params) {
 
   window.__soundingLand = {
     setView,
-    views: Object.keys(MAVERICKS_VIEWS),
+    views: Object.keys(stageViews),
     camera,
     meta: terrain.meta,
+    pins: terrain.pins,
   };
 
   let frameId = 0;
