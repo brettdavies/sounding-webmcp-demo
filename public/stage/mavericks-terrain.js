@@ -17,6 +17,10 @@ import {
   auditDemMesh,
   terrainSegmentsForGrid,
 } from './mavericks-dem-audit.js';
+import {
+  logCliffQa,
+  verifyCliffHeroViews,
+} from './mavericks-cliff-qa.js';
 
 export { TERRAIN_STRIDE } from './mavericks-dem-audit.js';
 
@@ -94,6 +98,7 @@ async function loadTex(url, opts = {}) {
  *   views: ReturnType<typeof buildViewsForPins>,
  *   viewVerify: ReturnType<typeof verifyMavericksViews>,
  *   demAudit: ReturnType<typeof auditDemMesh>,
+ *   cliffQa: ReturnType<typeof verifyCliffHeroViews>,
  *   dispose: () => void,
  * }>}
  */
@@ -112,6 +117,11 @@ export async function loadMavericksTerrain(metaIn, heightsIn) {
       r.arrayBuffer(),
     );
     heights = new Float32Array(buf);
+  }
+  const cliffQa = verifyCliffHeroViews(heights, meta, views, pins.mslY);
+  logCliffQa(cliffQa);
+  if (!cliffQa.ok) {
+    throw new Error(`[mavericks] cliff QA failed: ${JSON.stringify(cliffQa.issues)}`);
   }
   const { rows, cols, pixel_m: pixelM } = meta;
   const demAudit = auditDemMesh(heights, meta, TERRAIN_STRIDE);
@@ -221,6 +231,7 @@ export async function loadMavericksTerrain(metaIn, heightsIn) {
     views,
     viewVerify: report,
     demAudit,
+    cliffQa,
     dispose() {
       geo.dispose();
       mat.dispose();

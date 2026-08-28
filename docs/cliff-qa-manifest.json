@@ -1,0 +1,23 @@
+{
+  "version": 1,
+  "description": "Cliff hero-view QA manifest (P0b). Blocks ocean perf tiers until green.",
+  "bootUrl": "/?focus=sea&view={view}&seed=46012",
+  "heroViews": ["fallaway", "cliff", "shore", "reef"],
+  "referencePhotos": [
+    ".context/pictures/1787862950_pillar-point-diagram.jpg",
+    ".context/pictures/* cliff and coast photos (gitignored)"
+  ],
+  "invariants": {
+    "terrainStride": 1,
+    "demMaxSlopeDegMin": 60,
+    "perViewCorridorSlopeDegMin": 55,
+    "steepSamplesPerViewMin": 1
+  },
+  "verifyScripts": [
+    "scripts/verify-terrain-stride.sh",
+    "scripts/verify-cliff-qa.sh"
+  ],
+  "captureScript": "scripts/capture-cliff-qa.sh",
+  "captureSlugPrefix": "cliff-qa",
+  "acceptance": "Cliffs faceted and near-vertical in hero views; compare captures to reference photos in .context/pictures/"
+}

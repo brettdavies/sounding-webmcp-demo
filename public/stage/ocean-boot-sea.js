@@ -264,6 +264,7 @@ export async function bootSeaStage(mount, params) {
     demClip: dem ? { enabled: true, shorelineBias: 0.08 } : null,
     viewVerify: viewBundle.report,
     demAudit: terrain?.demAudit ?? null,
+    cliffQa: terrain?.cliffQa ?? null,
     mslY,
     buoyXz,
     ready: false,
