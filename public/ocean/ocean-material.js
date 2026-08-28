@@ -48,13 +48,13 @@ export function createOceanMaterial(cascades, options) {
     /** Scales FFT displacement (duck ambient chop while a heat face owns the shot). */
     cascadeScale: { value: 1 },
     // Always-on long Pacific swell (Gerstner) — the readable in-between sea.
-    swellAmplitude: { value: 1.4 },
-    swellSteepness: { value: 0.22 },
+    swellAmplitude: { value: 0.85 },
+    swellSteepness: { value: 0.18 },
     swellK: { value: (Math.PI * 2) / 380 },
     swellOmega: { value: Math.sqrt(9.81 * ((Math.PI * 2) / 380)) },
     swellDirection: { value: new THREE.Vector2(1, 0) },
-    swell2Amplitude: { value: 0.55 },
-    swell2Steepness: { value: 0.16 },
+    swell2Amplitude: { value: 0.35 },
+    swell2Steepness: { value: 0.14 },
     swell2K: { value: (Math.PI * 2) / 190 },
     swell2Omega: { value: Math.sqrt(9.81 * ((Math.PI * 2) / 190)) },
     swell2Direction: { value: new THREE.Vector2(0.98, 0.2) },

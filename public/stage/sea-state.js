@@ -57,9 +57,11 @@ export const SUN_DIRECTION = Object.freeze({
 
 /**
  * Still-water plane in DEM local meters (NAVD88).
- * Pillar Point Harbor NOAA 9414131: MSL ≈ 0.92 m above chart/MLLW (DEM Y≈0).
+ * Harbor datum lock: MLLW≈0.01, MSL≈0.92, MHHW≈1.72 (NOAA 9414131).
+ * Stage seats at MHHW so Gerstner troughs don’t drain the cliff-toe shelf;
+ * true MSL left a wide dry band at the west face.
  */
-export const MSL_Y = 0.92;
+export const MSL_Y = 1.72;
 
 /**
  * Break focus from `meta.json` break_line (Pillar Point diagram + DEM −5…−6 m).

@@ -67,10 +67,10 @@ export const MAVERICKS_VIEWS = Object.freeze({
     lookAt: { x: -200, y: 20, z: -280 },
     fov: 38,
   },
-  /** Harbor-facing spectator beach; eye ~2.5 m, looking at break peak. */
+  /** Harbor-facing spectator beach on dry sand (above MHHW); eye ~2.5 m → break. */
   spectators: {
-    position: { x: 160, y: 3.9, z: -80 },
-    lookAt: { x: -440, y: 5, z: -20 },
+    position: { x: -100, y: 5.5, z: -100 },
+    lookAt: { x: -440, y: 6, z: -20 },
     fov: 50,
   },
 });

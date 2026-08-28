@@ -170,11 +170,13 @@ export async function bootSeaStage(mount, params) {
   if (!reading.swell) reading.swell = {};
   reading.swell.direction_deg = reading.swell.direction_deg ?? swellFrom;
   const heatSchedule = buildHeatSchedule(reading, buoyXz);
+  let currentView = viewName;
 
   /** @param {string} name */
   const setView = (name) => {
     const v = MAVERICKS_VIEWS[name];
     if (!v) return;
+    currentView = name;
     camera.fov = v.fov;
     camera.updateProjectionMatrix();
     camera.position.set(v.position.x, v.position.y, v.position.z);
@@ -188,6 +190,7 @@ export async function bootSeaStage(mount, params) {
     meta: terrain?.meta ?? null,
     mslY: MSL_Y,
     buoyXz,
+    ready: false,
   };
 
   let elapsed = 0;
@@ -272,7 +275,7 @@ export async function bootSeaStage(mount, params) {
             ? 'tween'
             : heat.label || 'face'
           : 'swell';
-      waveEl.textContent = `${tag} ${faceM} m · ${heat.periodS} s · ${heat.directionDeg}° · ${viewName}`;
+      waveEl.textContent = `${tag} ${faceM} m · ${heat.periodS} s · ${heat.directionDeg}° · ${currentView}`;
     }
     if (asOfEl && heat.active > 0.2 && heat.kind === 'set') {
       asOfEl.textContent = `heat · ${heat.label} · rolling`;

@@ -202,8 +202,8 @@ export function ambientSwellAt(schedule, time, x, z) {
     .add(new THREE.Vector2(-dir.y, dir.x).multiplyScalar(0.2))
     .normalize();
   const waves = [
-    { amp: 1.4, steep: 0.22, length: 380, dir },
-    { amp: 0.55, steep: 0.16, length: 190, dir: dir2 },
+    { amp: 0.85, steep: 0.18, length: 380, dir },
+    { amp: 0.35, steep: 0.14, length: 190, dir: dir2 },
   ];
   const out = new THREE.Vector3();
   for (const w of waves) {

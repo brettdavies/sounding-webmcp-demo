@@ -23,7 +23,7 @@
   },
   "break_line": {
     "frame": "local_xz_m",
-    "note": "Plan-view crest / break polyline for Mavericks heat faces. Ocean still-water plane is separate (MSL ≈ Y 0.92 m NAVD88).",
+    "note": "Plan-view crest / break polyline for Mavericks heat faces. Stage still-water plane uses MHHW fill Y≈1.72 m NAVD88 (harbor MSL≈0.92).",
     "source": [
       ".context/pictures/pillar-point-diagram.jpg (Waves Break Here)",
       ".context/pictures/wave-energy.jpeg (reef focus / refraction)",
@@ -52,12 +52,12 @@
   },
   "spectators": {
     "frame": "local_xz_m",
-    "note": "Beach - Spectators from pillar-point-diagram.jpg: harbor-facing sand east of the tip, outside the breakwater. Low camera (~2–3 m eye height) looking west to the break.",
-    "x": 160,
-    "z": -80,
-    "ground_y": 1.37,
+    "note": "Beach - Spectators from pillar-point-diagram.jpg: dry sand on the harbor-facing toe east of the tip (above MHHW stage fill), eye ~2.5 m, looking west to the break.",
+    "x": -100,
+    "z": -100,
+    "ground_y": 3.0,
     "eye_height_m": 2.5,
-    "look_at": { "x": -440, "y": 5, "z": -20 }
+    "look_at": { "x": -440, "y": 6, "z": -20 }
   },
   "albedo": "NAIP 2022 + Poly Haven cliff/rock bake",
   "ortho": "CA DFW NAIP_2022 ImageServer export"
