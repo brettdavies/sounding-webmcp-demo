@@ -116,4 +116,4 @@ dropped in `public/models/`. Procedural stand-ins must not contradict ground tru
 - [x] `/api/reading` reflects buoy-sampled stats
 - [ ] QA manifest with epoch-prefixed shots *(manifest + capture plan verified; shots pending)*
 - [x] All **stage locks** traceable to cited ground truth
-- [ ] PR-ready branch
+- [x] PR-ready branch *(PR #1 open)*
