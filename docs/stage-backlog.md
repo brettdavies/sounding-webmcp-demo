@@ -104,8 +104,8 @@ dropped in `public/models/`. Procedural stand-ins must not contradict ground tru
 
 ## Definition of done (demo “best”)
 
-- [ ] **fallaway**, **reef**, **spectators** pass visual QA at MHHW on **default boot** *(runtime audit green in
-  browser; hero captures pending)*
+- [x] **fallaway**, **reef**, **spectators** pass visual QA at MHHW on **default boot** *(Glass captures: epoch
+  qa-fallaway/reef/spectators)*
 - [x] Cliffs read **near-vertical** in hero views (not melted slopes)
 - [x] Set wave every **5–7 s within a set**; curved **crest line**; occasional tube on bombs
 - [x] Buoy tracks wave surface; never airborne
@@ -114,6 +114,6 @@ dropped in `public/models/`. Procedural stand-ins must not contradict ground tru
 - [x] **<100 ms** first frame; full **stage** **≤2 s** *(boot-budget + placeholder sync gate)*
 - [x] Progressive ramp by **2 s** without pop-in
 - [x] `/api/reading` reflects buoy-sampled stats
-- [ ] QA manifest with epoch-prefixed shots *(manifest + capture plan verified; shots pending)*
+- [x] QA manifest with epoch-prefixed shots *(6 captures in .context/pictures/1787896465–6470_qa-*)*
 - [x] All **stage locks** traceable to cited ground truth
 - [x] PR-ready branch *(PR #1 open)*
