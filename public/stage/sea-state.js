@@ -78,7 +78,7 @@ export const BREAK_ROCKS = PIN_FALLBACKS.breakRocks;
  */
 export const DESIGN_CAMERA = Object.freeze({
   position: { x: -900, y: 80, z: 200 },
-  lookAt: { x: -440, y: 5, z: -20 },
+  lookAt: { x: BREAK_PEAK.x, y: MSL_Y + 4.5, z: BREAK_PEAK.z },
   fov: 44,
   near: 0.5,
   far: 8000,

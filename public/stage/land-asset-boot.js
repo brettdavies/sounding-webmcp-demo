@@ -8,6 +8,7 @@ import {
   loadMavericksTerrain,
 } from './mavericks-terrain.js';
 import { logPinSample } from './mavericks-pins.js';
+import { logViewVerification } from './mavericks-views-verify.js';
 
 /**
  * @param {HTMLElement} mount
@@ -74,6 +75,7 @@ export async function bootLandAsset(mount, params) {
   const terrain = await loadMavericksTerrain();
   scene.add(terrain.group);
   logPinSample(terrain.pins);
+  logViewVerification(terrain.viewVerify);
   const stageViews = terrain.views;
 
   const metersEl = document.getElementById('meters');

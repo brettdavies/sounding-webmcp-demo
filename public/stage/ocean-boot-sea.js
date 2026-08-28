@@ -29,7 +29,9 @@ import {
   MAVERICKS_VIEWS,
   loadMavericksTerrain,
   viewsForMeta,
+  verifiedViewsForMeta,
 } from './mavericks-terrain.js';
+import { logViewVerification } from './mavericks-views-verify.js';
 import {
   loadMavericksMeta,
   logPinSample,
@@ -69,7 +71,13 @@ export async function bootSeaStage(mount, params) {
     buoyXz: BUOY_XZ,
     swellFromDeg: MAVERICKS_SEA.swell.directionDegrees,
   };
-  const stageViews = metaBundle ? viewsForMeta(metaBundle.pins) : MAVERICKS_VIEWS;
+  const viewBundle = metaBundle
+    ? verifiedViewsForMeta(metaBundle.pins)
+    : { views: MAVERICKS_VIEWS, report: null };
+  const stageViews = viewBundle.views;
+  if (viewBundle.report) {
+    logViewVerification(viewBundle.report);
+  }
   const mslY = pins.mslY;
 
   /** @type {ReturnType<typeof createDemHeightTexture> | null} */
@@ -254,6 +262,7 @@ export async function bootSeaStage(mount, params) {
     meta: terrain?.meta ?? metaBundle?.meta ?? null,
     pins: terrain?.pins ?? metaBundle?.pins ?? null,
     demClip: dem ? { enabled: true, shorelineBias: 0.08 } : null,
+    viewVerify: viewBundle.report,
     mslY,
     buoyXz,
     ready: false,

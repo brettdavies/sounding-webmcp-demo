@@ -15,7 +15,7 @@ Phased implementation order, async user assets, and definition of done. Each sli
   route)
 - [x] Ocean height mask vs DEM (no water on land, no dry cliff shelf in trough)
 - [x] GPU displacement aligned with CPU buoy sample
-- [ ] All `MAVERICKS_VIEWS` verified at MHHW
+- [x] All `MAVERICKS_VIEWS` verified at MHHW
 - [x] **Station / pillar XZ ↔ DEM elevation reconciled** (`meta.json` 2026-08-27)
 - [x] Wire reconciled pins into `mavericks-terrain.js` views, `sea-state.js`, buoy mooring QA
 - [ ] **Rename code to match [`stage-glossary.md`](stage-glossary.md)** — set-wave overlay vocabulary (see scope below)

@@ -4,6 +4,14 @@
  */
 import * as THREE from 'three';
 import { extractPins } from './mavericks-pins.js';
+import {
+  buildViewsForPins,
+  MAVERICKS_VIEWS_BASE,
+} from './mavericks-views-build.js';
+import {
+  logViewVerification,
+  verifyMavericksViews,
+} from './mavericks-views-verify.js';
 
 /**
  * @typedef {{
@@ -32,49 +40,7 @@ import { extractPins } from './mavericks-pins.js';
  * }} MavericksMeta
  */
 
-export const MAVERICKS_VIEWS = Object.freeze({
-  aerial: {
-    position: { x: -200, y: 520, z: 680 },
-    lookAt: { x: -100, y: 10, z: -200 },
-    fov: 48,
-  },
-  shore: {
-    position: { x: -520, y: 55, z: 280 },
-    lookAt: { x: -180, y: 25, z: -280 },
-    fov: 42,
-  },
-  cliff: {
-    position: { x: -380, y: 22, z: -40 },
-    lookAt: { x: -180, y: 30, z: -300 },
-    fov: 40,
-  },
-  reef: {
-    position: { x: -620, y: 90, z: 120 },
-    lookAt: { x: -280, y: -5, z: -200 },
-    fov: 46,
-  },
-  fallaway: {
-    position: { x: -900, y: 80, z: 200 },
-    lookAt: { x: -400, y: -15, z: -100 },
-    fov: 44,
-  },
-  station: {
-    position: { x: -40, y: 95, z: -80 },
-    lookAt: { x: -180, y: 50, z: -320 },
-    fov: 40,
-  },
-  tip: {
-    position: { x: -280, y: 35, z: 80 },
-    lookAt: { x: -200, y: 20, z: -280 },
-    fov: 38,
-  },
-  /** Harbor-facing spectator beach on dry sand (above MHHW); eye ~2.5 m → break. */
-  spectators: {
-    position: { x: -100, y: 5.5, z: 100 },
-    lookAt: { x: -440, y: 6, z: -20 },
-    fov: 50,
-  },
-});
+export const MAVERICKS_VIEWS = MAVERICKS_VIEWS_BASE;
 
 /**
  * Merge static camera rigs with reconciled pins from meta.json.
@@ -83,21 +49,18 @@ export const MAVERICKS_VIEWS = Object.freeze({
 export function viewsForMeta(metaOrPins) {
   const pins =
     'breakPeak' in metaOrPins ? metaOrPins : extractPins(/** @type {Record<string, unknown>} */ (metaOrPins));
-  const spec = pins.spectators;
-  const peak = pins.breakPeak;
-  const views = { ...MAVERICKS_VIEWS };
-  if (spec) {
-    views.spectators = {
-      position: {
-        x: spec.x,
-        y: (spec.ground_y ?? 0) + (spec.eye_height_m ?? 2.5),
-        z: spec.z,
-      },
-      lookAt: spec.look_at ?? { x: peak.x, y: 6, z: peak.z },
-      fov: 50,
-    };
-  }
-  return Object.freeze(views);
+  return buildViewsForPins(pins);
+}
+
+/**
+ * @param {import('./mavericks-pins.js').MavericksPins | Record<string, unknown>} metaOrPins
+ */
+export function verifiedViewsForMeta(metaOrPins) {
+  const pins =
+    'breakPeak' in metaOrPins ? metaOrPins : extractPins(/** @type {Record<string, unknown>} */ (metaOrPins));
+  const views = buildViewsForPins(pins);
+  const report = verifyMavericksViews(views, pins);
+  return { views, report };
 }
 
 /**
@@ -121,7 +84,8 @@ async function loadTex(url, opts = {}) {
  *   group: THREE.Group,
  *   meta: MavericksMeta,
  *   pins: import('./mavericks-pins.js').MavericksPins,
- *   views: ReturnType<typeof viewsForMeta>,
+ *   views: ReturnType<typeof buildViewsForPins>,
+ *   viewVerify: ReturnType<typeof verifyMavericksViews>,
  *   dispose: () => void,
  * }>}
  */
@@ -130,7 +94,8 @@ export async function loadMavericksTerrain(metaIn, heightsIn) {
     metaIn ?? (await fetch('/land/mavericks/meta.json').then((r) => r.json()))
   );
   const pins = extractPins(/** @type {Record<string, unknown>} */ (meta));
-  const views = viewsForMeta(pins);
+  const { views, report } = verifiedViewsForMeta(pins);
+  logViewVerification(report);
   let heights;
   if (heightsIn) {
     heights = heightsIn;
@@ -244,6 +209,7 @@ export async function loadMavericksTerrain(metaIn, heightsIn) {
     meta,
     pins,
     views,
+    viewVerify: report,
     dispose() {
       geo.dispose();
       mat.dispose();
