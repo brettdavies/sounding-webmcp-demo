@@ -44,9 +44,11 @@
     "scripts/verify-overlay-readout.sh",
     "scripts/verify-cliff-qa.sh",
     "scripts/verify-terrain-stride.sh",
-    "scripts/verify-qa-manifest.sh"
+    "scripts/verify-qa-manifest.sh",
+    "scripts/verify-capture-qa-manifest.sh"
   ],
   "captureScript": "scripts/capture-qa-manifest.sh",
+  "captureVerifyScript": "scripts/verify-capture-qa-manifest.sh",
   "captureSlugPrefix": "qa",
   "captureBudgetSec": 20,
   "relatedManifests": ["docs/cliff-qa-manifest.json"],

@@ -73,3 +73,61 @@ export function sampleQaManifestUrls(manifest) {
     lowEnd: String(manifest.lowEndTier?.url ?? ''),
   };
 }
+
+/**
+ * @param {Record<string, unknown>} manifest
+ */
+export function buildCapturePlan(manifest) {
+  const prefix = String(manifest.captureSlugPrefix ?? 'qa');
+  const budgetSec = Number(manifest.captureBudgetSec ?? 20);
+  const loopTimes = /** @type {Record<string, number>} */ (manifest.loopTimes ?? {});
+  const opener = loopTimes.opener ?? 4;
+  const captureViews = /** @type {string[]} */ (manifest.captureViews ?? []);
+  /** @type {Array<{ slug: string, url: string, kind: string, view: string }>} */
+  const captures = captureViews.map((view) => ({
+    slug: `${prefix}-${view}`,
+    url: buildQaUrl(manifest, { view, loop_t: opener }),
+    kind: 'hero',
+    view,
+  }));
+  captures.push({
+    slug: `${prefix}-stress-reef`,
+    url: buildQaUrl(manifest, {
+      view: 'reef',
+      seed: Number(manifest.stressSeed),
+      loop_t: loopTimes.tubeBomb ?? 73,
+    }),
+    kind: 'stress',
+    view: 'reef',
+  });
+  captures.push({
+    slug: `${prefix}-lowend-reef`,
+    url: String(manifest.lowEndTier?.url ?? '/?view=reef&debug=perf&nopanel'),
+    kind: 'lowEnd',
+    view: 'reef',
+  });
+  return { budgetSec, captures };
+}
+
+/**
+ * @param {ReturnType<typeof buildCapturePlan>} plan
+ */
+export function verifyCapturePlan(plan) {
+  const hero = plan.captures.filter((c) => c.kind === 'hero');
+  const stress = plan.captures.find((c) => c.kind === 'stress');
+  const lowEnd = plan.captures.find((c) => c.kind === 'lowEnd');
+  const ok =
+    plan.budgetSec <= 20 &&
+    hero.length >= 4 &&
+    hero.every((c) => c.url.startsWith('/?view=') && !c.url.includes('focus=sea')) &&
+    stress != null &&
+    stress.url.includes('seed=99991') &&
+    lowEnd != null &&
+    lowEnd.url.includes('debug=perf');
+  return {
+    ok,
+    heroCount: hero.length,
+    budgetSec: plan.budgetSec,
+    slugs: plan.captures.map((c) => c.slug),
+  };
+}
