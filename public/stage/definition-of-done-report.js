@@ -53,8 +53,8 @@ export const DEFINITION_OF_DONE_ITEMS = [
     id: 'fps-120',
     label: '≥120 fps after quality settle',
     kind: 'hardware',
-    scripts: ['verify-perf-gate'],
-    note: 'Adaptive tier gate verified; 120 fps hardware-dependent',
+    scripts: ['verify-perf-gate', 'verify-fps-settle'],
+    note: 'Adaptive tier + DPR; fpsSettleAudit on __soundingBoot',
   },
   {
     id: 'boot-timing',

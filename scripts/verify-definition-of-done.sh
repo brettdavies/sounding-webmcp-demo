@@ -26,6 +26,7 @@ scripts=(
   verify-layer-controls
   verify-quality-ramp
   verify-perf-gate
+  verify-fps-settle
   verify-reading-alignment
   verify-ground-truth-locks
   verify-hero-views-runtime

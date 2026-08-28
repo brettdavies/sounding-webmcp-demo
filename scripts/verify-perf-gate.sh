@@ -18,14 +18,17 @@ import {
   samplePerfGatePass,
   STEADY_FPS_TARGET,
   effectiveOceanSegments,
+  effectiveDpr,
   shouldUpdateOceanFft,
+  PERF_OCEAN_TIERS,
 } from './public/stage/perf-gate.js';
 
 const pass = verifyPerfGate(samplePerfGatePass());
 const fail = verifyPerfGate({ fps: 90, tier: 2, rampSettled: true, samples: 64 });
 const segments = effectiveOceanSegments({ settled: true, segments: 360 }, 2);
 const fft = shouldUpdateOceanFft(4, 2);
-console.log('perf-gate:', JSON.stringify({ pass, fail, segments, fft, target: STEADY_FPS_TARGET }, null, 2));
-if (!pass.ok || fail.ok || segments !== 128 || !fft) process.exit(1);
+const dpr4 = effectiveDpr(4, 2);
+console.log('perf-gate:', JSON.stringify({ pass, fail, segments, fft, dpr4, tiers: PERF_OCEAN_TIERS.length, target: STEADY_FPS_TARGET }, null, 2));
+if (!pass.ok || fail.ok || segments !== 128 || !fft || dpr4 !== 0.5 || PERF_OCEAN_TIERS.length !== 5) process.exit(1);
 console.log('OK: perf gate target', STEADY_FPS_TARGET, 'fps; tier caps ocean only');
 "

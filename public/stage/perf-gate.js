@@ -9,10 +9,11 @@ export const MIN_STEADY_SAMPLES = 48;
 
 /** Ocean/FX tiers — lower cost first; terrain stride stays full-res elsewhere. */
 export const PERF_OCEAN_TIERS = Object.freeze([
-  { id: 0, segments: 360, fftSkip: 1, fxMul: 1, spray: true },
-  { id: 1, segments: 240, fftSkip: 1, fxMul: 0.85, spray: true },
-  { id: 2, segments: 128, fftSkip: 2, fxMul: 0.7, spray: false },
-  { id: 3, segments: 64, fftSkip: 2, fxMul: 0.55, spray: false },
+  { id: 0, segments: 360, fftSkip: 1, fxMul: 1, spray: true, dpr: 2 },
+  { id: 1, segments: 240, fftSkip: 1, fxMul: 0.85, spray: true, dpr: 1.5 },
+  { id: 2, segments: 128, fftSkip: 2, fxMul: 0.7, spray: false, dpr: 1 },
+  { id: 3, segments: 64, fftSkip: 2, fxMul: 0.55, spray: false, dpr: 0.75 },
+  { id: 4, segments: 48, fftSkip: 4, fxMul: 0.4, spray: false, dpr: 0.5 },
 ]);
 
 const LOW_FPS_THRESHOLD = 110;
@@ -131,4 +132,14 @@ export function effectiveOceanSegments(ramp, perfTier) {
  */
 export function shouldUpdateOceanFft(frameIndex, fftSkip) {
   return frameIndex % Math.max(1, fftSkip) === 0;
+}
+
+/**
+ * Cap device pixel ratio for render cost at a perf tier.
+ * @param {number} perfTier
+ * @param {number} [deviceDpr]
+ */
+export function effectiveDpr(perfTier, deviceDpr = 1) {
+  const cap = PERF_OCEAN_TIERS[perfTier]?.dpr ?? 2;
+  return Math.min(deviceDpr || 1, cap);
 }

@@ -21,6 +21,7 @@ import {
 import {
   createPerfGate,
   effectiveOceanSegments,
+  effectiveDpr,
   shouldUpdateOceanFft,
   verifyPerfGate,
 } from './perf-gate.js';
@@ -62,6 +63,7 @@ import {
   overlayReadout,
 } from './overlay-readout.js';
 import { auditHeroViews } from './hero-views-runtime.js';
+import { auditFpsSettle } from './fps-settle-verify.js';
 import {
   updateShoreWash,
   verifyShoreWhitewash,
@@ -124,7 +126,9 @@ export async function bootSeaStage(mount, params) {
     antialias: true,
     powerPreference: 'high-performance',
   });
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  renderer.setPixelRatio(
+    effectiveDpr(0, window.devicePixelRatio || 1),
+  );
   renderer.setSize(mount.clientWidth, mount.clientHeight, false);
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -642,6 +646,7 @@ export async function bootSeaStage(mount, params) {
     qualityRampVerify,
     perfGate: perfGate.snapshot(),
     heroViewsAudit: () => auditHeroViews(setView, () => window.__soundingSea),
+    fpsSettleAudit: () => auditFpsSettle(() => window.__soundingSea),
   };
   window.__soundingBoot = window.__soundingSea;
   console.info('[mavericks] boot budget', window.__soundingBoot.budget);
@@ -671,6 +676,10 @@ export async function bootSeaStage(mount, params) {
   let currentSegments = bootSegments;
   let rampSettled = false;
   let frameIndex = 0;
+  let currentDpr = effectiveDpr(0, window.devicePixelRatio || 1);
+  /** @type {THREE.Vector3 | null} */
+  let cachedBuoyDisp = null;
+  let buoyDispValid = false;
 
   const tick = (ts) => {
     if (disposed) return;
@@ -695,6 +704,13 @@ export async function bootSeaStage(mount, params) {
     });
     const perfProfile = gateSnap.profile;
     const targetSegments = effectiveOceanSegments(ramp, gateSnap.tier);
+    const targetDpr = effectiveDpr(gateSnap.tier, window.devicePixelRatio || 1);
+
+    if (targetDpr !== currentDpr) {
+      currentDpr = targetDpr;
+      renderer.setPixelRatio(currentDpr);
+      onResize();
+    }
 
     if (targetSegments !== currentSegments) {
       setOceanSegmentTier(oceanMesh, targetSegments);
@@ -780,12 +796,25 @@ export async function bootSeaStage(mount, params) {
     }
     oceanMaterial.uniforms.time.value = elapsed;
 
-    const gpuDisp = surfaceProbe.sample(
-      activeOceanSystem.cascades,
-      oceanMaterial,
-      buoyXz.x,
-      buoyXz.z,
-    );
+    const fftFrame = shouldUpdateOceanFft(frameIndex, perfProfile.fftSkip);
+    if (!cachedBuoyDisp) {
+      cachedBuoyDisp = new THREE.Vector3();
+    }
+    if (layerFlags.fft && (fftFrame || !buoyDispValid)) {
+      cachedBuoyDisp.copy(
+        surfaceProbe.sample(
+          activeOceanSystem.cascades,
+          oceanMaterial,
+          buoyXz.x,
+          buoyXz.z,
+        ),
+      );
+      buoyDispValid = true;
+    } else if (!layerFlags.fft) {
+      cachedBuoyDisp.set(0, 0, 0);
+      buoyDispValid = false;
+    }
+    const gpuDisp = cachedBuoyDisp;
     const eta = gpuDisp.y;
     const dispX = gpuDisp.x;
     const dispZ = gpuDisp.z;

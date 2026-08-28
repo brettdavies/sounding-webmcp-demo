@@ -32,7 +32,8 @@
     "window.__soundingBoot.bootVerify.ok",
     "window.__soundingBoot.foamQa.ok",
     "window.__soundingBoot.overlayVerify.ok",
-    "window.__soundingBoot.heroViewsAudit().ok"
+    "window.__soundingBoot.heroViewsAudit().ok",
+    "window.__soundingBoot.fpsSettleAudit()"
   ],
   "verifyScripts": [
     "scripts/verify-default-boot.sh",
