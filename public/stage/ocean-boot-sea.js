@@ -16,6 +16,7 @@ import {
   updateSprayLevel,
   verifyBuoySpray,
 } from './buoy-spray.js';
+import { verifyFoamQa } from './foam-qa.js';
 import { HeightProbe } from './height-probe.js';
 import {
   logBuoyAlignment,
@@ -303,6 +304,11 @@ export async function bootSeaStage(mount, params) {
   console.info('[mavericks] reef whitewash', reefWhitewash);
   const buoySprayVerify = verifyBuoySpray();
   console.info('[mavericks] buoy spray', buoySprayVerify);
+  const foamQa = verifyFoamQa({
+    spectators: shoreCenter,
+    breakPeak: reefPeak,
+  });
+  console.info('[mavericks] foam QA', foamQa);
   const openerPeak = sampleSetWave(setWaveSchedule, 4);
   const overlayVerify = {
     ok:
@@ -405,6 +411,7 @@ export async function bootSeaStage(mount, params) {
     shoreWhitewash,
     reefWhitewash,
     buoySpray: buoySprayVerify,
+    foamQa,
     shoreWash: { level: 0, center: shoreCenter },
     reefWash: { level: 0, peak: reefPeak },
     spray: { level: 0 },
