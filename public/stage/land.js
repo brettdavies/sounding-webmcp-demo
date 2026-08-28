@@ -1,7 +1,7 @@
 /**
  * Pillar Point land + Mavericks bathymetry — one locked group.
  *
- * Layout from `.context/pictures/wave-energy.jpeg` (shaded-relief map):
+ * Layout from `.context/pictures/1787862980_wave-energy.jpeg` (shaded-relief map):
  *   - Hook peninsula tip (tan headland) → thin neck → harbor side
  *   - Finger reef ridges west/SW of tip, roughly NW–SE, focusing swell
  *   - Steep fallaway into deeper Pacific west of the ridge field

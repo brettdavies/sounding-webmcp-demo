@@ -71,9 +71,10 @@ Agree problem, contract, reuse boundaries, acceptance gates.
 - Face wavelength/steepness tuned to roll, not storm pinnacles.
 - Overlay live from buoy sample + active heat event.
 - **Break line locked** in `public/land/mavericks/meta.json` → `break_line` (peak `(-440, -20)`, polyline over −5…−6 m
-  reef; from `.context/pictures/pillar-point-diagram.jpg` + DEM). Faces aim at `peak`; crest runs along `polyline`.
-- Ocean still-water plane at **MSL Y = 0.92 m** NAVD88; DEM terrain under sea (`?focus=sea`). Spectator camera:
-  `?view=spectators`.
+  reef; from `.context/pictures/1787862950_pillar-point-diagram.jpg` + DEM). Faces aim at `peak`; crest runs along
+  `polyline`.
+- Stage still-water at **MHHW Y ≈ 1.72 m** NAVD88 (harbor MSL 0.92); DEM terrain under sea (`?focus=sea`). Spectator
+  camera: `?view=spectators`. Review shots: `{epoch}_{slug}` via `scripts/save-picture.sh`.
 
 ### Phase 5 — Land + station
 
