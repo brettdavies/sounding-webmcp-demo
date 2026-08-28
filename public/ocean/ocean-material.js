@@ -12,6 +12,7 @@ const skyFunction = `
 `;
 
 export function createOceanMaterial(cascades, options) {
+  const dem = options.dem ?? null;
   const uniforms = {
     displacement0: { value: cascades[0].displacement },
     displacement1: { value: cascades[1].displacement },
@@ -58,6 +59,21 @@ export function createOceanMaterial(cascades, options) {
     swell2K: { value: (Math.PI * 2) / 190 },
     swell2Omega: { value: Math.sqrt(9.81 * ((Math.PI * 2) / 190)) },
     swell2Direction: { value: new THREE.Vector2(0.98, 0.2) },
+    demHeightMap: { value: dem?.texture ?? null },
+    demParams: {
+      value: new THREE.Vector3(
+        dem?.halfSpan ?? 0,
+        dem?.pixelM ?? 4,
+        options.shorelineBias ?? 0.08,
+      ),
+    },
+    demGrid: {
+      value: new THREE.Vector2(
+        (dem?.cols ?? 1) - 1,
+        (dem?.rows ?? 1) - 1,
+      ),
+    },
+    demClipEnabled: { value: dem ? 1 : 0 },
   };
 
   const heatGerstnerGlsl = `
@@ -143,6 +159,21 @@ export function createOceanMaterial(cascades, options) {
           0.0,
           heatDirection.y * dy_dAlong + heatDirection.y * horizontal * 0.25
         );
+      }
+
+      uniform sampler2D demHeightMap;
+      uniform vec3 demParams;
+      uniform vec2 demGrid;
+      uniform float demClipEnabled;
+
+      float sampleDemHeight(vec2 xz) {
+        float col = (xz.x + demParams.x) / demParams.y;
+        float row = (demParams.x - xz.z) / demParams.y;
+        vec2 uv = vec2(col / demGrid.x, row / demGrid.y);
+        if (uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0) {
+          return -1e6;
+        }
+        return texture(demHeightMap, uv).r;
       }
   `;
 
@@ -242,6 +273,13 @@ export function createOceanMaterial(cascades, options) {
       }
 
       void main() {
+        if (demClipEnabled > 0.5) {
+          float terrainY = sampleDemHeight(oceanPosition);
+          if (terrainY > worldPositionVarying.y - demParams.z) {
+            discard;
+          }
+        }
+
         vec4 derivative =
           (sampleDerivatives(derivatives0, oceanPosition, patchLengths.x) +
           sampleDerivatives(derivatives1, oceanPosition, patchLengths.y) +
@@ -301,6 +339,15 @@ export function createOceanMaterial(cascades, options) {
           float history = min(displacementA.a, displacementB.a);
           outputColor = vec4(
             mix(vec3(0.95, 0.2, 0.06), vec3(0.04, 0.12, 0.18), clamp(history, 0.0, 1.0)),
+            1.0
+          );
+          return;
+        }
+        if (debugMode == 4) {
+          float terrainY = sampleDemHeight(oceanPosition);
+          float margin = worldPositionVarying.y - demParams.z - terrainY;
+          outputColor = vec4(
+            margin > 0.0 ? vec3(0.08, 0.45, 0.95) : vec3(0.95, 0.18, 0.08),
             1.0
           );
           return;

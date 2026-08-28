@@ -31,6 +31,10 @@ import {
   logPinSample,
 } from './mavericks-pins.js';
 import {
+  createDemHeightTexture,
+  logShorelineSamples,
+} from './mavericks-dem-texture.js';
+import {
   BREAK_PEAK,
   BUOY_XZ,
   DESIGN_CAMERA,
@@ -63,6 +67,29 @@ export async function bootSeaStage(mount, params) {
   };
   const stageViews = metaBundle ? viewsForMeta(metaBundle.pins) : MAVERICKS_VIEWS;
   const mslY = pins.mslY;
+
+  /** @type {ReturnType<typeof createDemHeightTexture> | null} */
+  let dem = null;
+  /** @type {Float32Array | null} */
+  let demHeights = null;
+  if (metaBundle?.meta) {
+    try {
+      const buf = await fetch('/land/mavericks/height.f32').then((r) =>
+        r.arrayBuffer(),
+      );
+      demHeights = new Float32Array(buf);
+      dem = createDemHeightTexture(demHeights, metaBundle.meta);
+      logShorelineSamples(dem, mslY, [
+        { name: 'spectators_beach', x: -100, z: 100 },
+        { name: 'station_plateau', x: -182, z: 322 },
+        { name: 'break_peak', x: pins.breakPeak.x, z: pins.breakPeak.z },
+        { name: 'sail_rock', x: -338, z: -197 },
+        { name: 'cliff_toe_west', x: -520, z: -80 },
+      ]);
+    } catch (error) {
+      console.warn('[sounding] DEM shoreline clip failed', error);
+    }
+  }
 
   const viewName = params.get('view') || 'fallaway';
   const view = stageViews[viewName] || {
@@ -117,6 +144,8 @@ export async function bootSeaStage(mount, params) {
     patchLengths: MAVERICKS_SEA.patchLengths,
     sunDirection,
     detailTexture,
+    dem,
+    shorelineBias: 0.08,
   });
   oceanMaterial.uniforms.foamScale.value = 0.7;
   oceanMaterial.uniforms.foamThreshold.value = 0.2;
@@ -167,7 +196,7 @@ export async function bootSeaStage(mount, params) {
   /** @type {Awaited<ReturnType<typeof loadMavericksTerrain>> | null} */
   let terrain = null;
   try {
-    terrain = await loadMavericksTerrain(metaBundle?.meta);
+    terrain = await loadMavericksTerrain(metaBundle?.meta, demHeights ?? undefined);
     scene.add(terrain.group);
   } catch (error) {
     console.warn('[sounding] DEM terrain failed', error);
@@ -218,6 +247,7 @@ export async function bootSeaStage(mount, params) {
     camera,
     meta: terrain?.meta ?? metaBundle?.meta ?? null,
     pins: terrain?.pins ?? metaBundle?.pins ?? null,
+    demClip: dem ? { enabled: true, shorelineBias: 0.08 } : null,
     mslY,
     buoyXz,
     ready: false,
@@ -333,6 +363,7 @@ export async function bootSeaStage(mount, params) {
       detailTexture.dispose();
       heightProbe.dispose();
       buoy?.dispose();
+      dem?.dispose();
       terrain?.dispose();
       renderer.dispose();
       mount.replaceChildren();

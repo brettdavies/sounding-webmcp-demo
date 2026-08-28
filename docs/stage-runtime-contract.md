@@ -77,14 +77,14 @@ captures for the integrated demo use `?focus=sea`.
 
 ### Other URL params
 
-| Param                   | Effect                                                                   |
-| ----------------------- | ------------------------------------------------------------------------ |
-| `?view=`                | Authored camera: `fallaway`, `reef`, `spectators`, `station`, …          |
-| `?debug=perf`           | Frame EMA, fps, boot marks on `window.__soundingBoot` (when implemented) |
-| `?debug=1…4`            | Ocean shader diagnostic modes (when implemented)                         |
-| `?nopanel` / `?panel=0` | Hide layer panel (when implemented)                                      |
-| `?seed=`                | Override deterministic seed (default `46012`)                            |
-| `?loop_t=`              | Seek time in the compressed **heat loop** (seconds) for QA               |
+| Param                   | Effect                                                                          |
+| ----------------------- | ------------------------------------------------------------------------------- |
+| `?view=`                | Authored camera: `fallaway`, `reef`, `spectators`, `station`, …                 |
+| `?debug=perf`           | Frame EMA, fps, boot marks on `window.__soundingBoot` (when implemented)        |
+| `?debug=1…4`            | Ocean shader diagnostic modes (`4` = shoreline margin: blue=water, red=clipped) |
+| `?nopanel` / `?panel=0` | Hide layer panel (when implemented)                                             |
+| `?seed=`                | Override deterministic seed (default `46012`)                                   |
+| `?loop_t=`              | Seek time in the compressed **heat loop** (seconds) for QA                      |
 
 Runtime (sea stage): `window.__soundingSea.setView(name)`.
 

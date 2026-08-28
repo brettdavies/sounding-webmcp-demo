@@ -116,6 +116,7 @@ async function loadTex(url, opts = {}) {
 
 /**
  * @param {Record<string, unknown>} [metaIn] Optional pre-fetched meta (avoids duplicate fetch).
+ * @param {Float32Array} [heightsIn] Optional pre-fetched height field (avoids duplicate fetch).
  * @returns {Promise<{
  *   group: THREE.Group,
  *   meta: MavericksMeta,
@@ -124,16 +125,21 @@ async function loadTex(url, opts = {}) {
  *   dispose: () => void,
  * }>}
  */
-export async function loadMavericksTerrain(metaIn) {
+export async function loadMavericksTerrain(metaIn, heightsIn) {
   const meta = /** @type {MavericksMeta} */ (
     metaIn ?? (await fetch('/land/mavericks/meta.json').then((r) => r.json()))
   );
   const pins = extractPins(/** @type {Record<string, unknown>} */ (meta));
   const views = viewsForMeta(pins);
-  const buf = await fetch('/land/mavericks/height.f32').then((r) =>
-    r.arrayBuffer(),
-  );
-  const heights = new Float32Array(buf);
+  let heights;
+  if (heightsIn) {
+    heights = heightsIn;
+  } else {
+    const buf = await fetch('/land/mavericks/height.f32').then((r) =>
+      r.arrayBuffer(),
+    );
+    heights = new Float32Array(buf);
+  }
   const { rows, cols, pixel_m: pixelM } = meta;
   if (heights.length !== rows * cols) {
     throw new Error(
