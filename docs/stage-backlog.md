@@ -76,7 +76,7 @@ One evidence-gated commit; no behavior change — rename only. Update glossary
 
 ### P4 — Visual validation manifest
 
-- [ ] `docs/qa-manifest.json` on default URL
+- [x] `docs/qa-manifest.json` on default URL
 - [ ] Capture script: load → 4 views → save pictures (<20 s)
 - [ ] Stress seed + low-end tier snapshot
 

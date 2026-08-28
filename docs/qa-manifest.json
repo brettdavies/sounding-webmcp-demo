@@ -1,0 +1,54 @@
+{
+  "version": 1,
+  "description": "Default-boot integrated stage QA manifest (P4). Full sea stage at MHHW — no focus=sea required.",
+  "defaultBoot": true,
+  "bootUrl": "/?view={view}&seed={seed}&loop_t={loop_t}",
+  "bootUrlMinimal": "/?view={view}",
+  "heroViews": ["fallaway", "reef", "spectators"],
+  "captureViews": ["fallaway", "reef", "spectators", "cliff"],
+  "supplementalViews": ["shore", "station", "aerial", "tip"],
+  "seed": 46012,
+  "stressSeed": 99991,
+  "loopTimes": {
+    "opener": 4,
+    "lull": 28,
+    "tubeBomb": 73
+  },
+  "lowEndTier": {
+    "perfTier": 3,
+    "segments": 64,
+    "url": "/?view=reef&seed=46012&debug=perf&nopanel"
+  },
+  "invariants": {
+    "bootMode": "sea",
+    "mslDatum": "MHHW",
+    "terrainStride": 1,
+    "placeholderSyncBudgetMs": 100,
+    "qualityRampSec": 2,
+    "steadyFpsTarget": 120
+  },
+  "runtimeChecks": [
+    "window.__soundingBoot.ready",
+    "window.__soundingBoot.bootVerify.ok",
+    "window.__soundingBoot.foamQa.ok",
+    "window.__soundingBoot.overlayVerify.ok"
+  ],
+  "verifyScripts": [
+    "scripts/verify-default-boot.sh",
+    "scripts/verify-mavericks-views.sh",
+    "scripts/verify-boot-budget.sh",
+    "scripts/verify-placeholder-boot.sh",
+    "scripts/verify-quality-ramp.sh",
+    "scripts/verify-perf-gate.sh",
+    "scripts/verify-foam-qa.sh",
+    "scripts/verify-overlay-readout.sh",
+    "scripts/verify-cliff-qa.sh",
+    "scripts/verify-terrain-stride.sh",
+    "scripts/verify-qa-manifest.sh"
+  ],
+  "captureScript": "scripts/capture-qa-manifest.sh",
+  "captureSlugPrefix": "qa",
+  "captureBudgetSec": 20,
+  "relatedManifests": ["docs/cliff-qa-manifest.json"],
+  "acceptance": "Hero views on default boot show near-vertical cliffs, readable set-wave overlay, pulsing foam, moored buoy; boot marks and runtime checks green."
+}
