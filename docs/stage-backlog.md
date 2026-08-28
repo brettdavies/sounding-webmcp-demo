@@ -54,7 +54,7 @@ One evidence-gated commit; no behavior change — rename only. Update glossary
 
 - [x] Shore whitewash mask + temporal decay
 - [x] Reef whitewash: cascade history + set-wave lip
-- [ ] Buoy spray on set-wave impact
+- [x] Buoy spray on set-wave impact
 - [ ] QA: no permanent white band at beach; spray off in lulls
 
 ### P2 — Land polish

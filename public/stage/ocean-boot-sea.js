@@ -11,6 +11,11 @@ import {
 } from '../ocean/ocean-material.js';
 import { createOceanDetailTexture } from '../ocean/detail-texture.js';
 import { loadBuoy } from './buoy.js';
+import {
+  attachBuoySpray,
+  updateSprayLevel,
+  verifyBuoySpray,
+} from './buoy-spray.js';
 import { HeightProbe } from './height-probe.js';
 import {
   logBuoyAlignment,
@@ -222,9 +227,12 @@ export async function bootSeaStage(mount, params) {
 
   /** @type {Awaited<ReturnType<typeof loadBuoy>> | null} */
   let buoy = null;
+  /** @type {import('./buoy-spray.js').BuoySpray | null} */
+  let buoySpray = null;
   try {
     buoy = await loadBuoy();
     scene.add(buoy.group);
+    buoySpray = attachBuoySpray(buoy.group);
   } catch (error) {
     console.warn('[sounding] buoy load failed', error);
   }
@@ -293,6 +301,8 @@ export async function bootSeaStage(mount, params) {
   console.info('[mavericks] shore whitewash', shoreWhitewash);
   const reefWhitewash = verifyReefWhitewash(reefPeak);
   console.info('[mavericks] reef whitewash', reefWhitewash);
+  const buoySprayVerify = verifyBuoySpray();
+  console.info('[mavericks] buoy spray', buoySprayVerify);
   const openerPeak = sampleSetWave(setWaveSchedule, 4);
   const overlayVerify = {
     ok:
@@ -394,8 +404,10 @@ export async function bootSeaStage(mount, params) {
     overlayVerify,
     shoreWhitewash,
     reefWhitewash,
+    buoySpray: buoySprayVerify,
     shoreWash: { level: 0, center: shoreCenter },
     reefWash: { level: 0, peak: reefPeak },
+    spray: { level: 0 },
     view: currentView,
     setWave: lastSetWave,
     mslY,
@@ -427,6 +439,7 @@ export async function bootSeaStage(mount, params) {
   const maxAlignmentChecks = 120;
   const shoreWashState = { level: 0 };
   const reefWashState = { level: 0 };
+  const sprayState = { level: 0 };
 
   const tick = (ts) => {
     if (disposed) return;
@@ -527,6 +540,14 @@ export async function bootSeaStage(mount, params) {
       buoy.group.position.y = mslY + buoy.dynamics.heave;
     }
 
+    const sprayLevel = updateSprayLevel(sprayState, setWave, dt, eta);
+    if (buoySpray) {
+      buoySpray.update({ level: sprayLevel, dt, camera });
+    }
+    if (window.__soundingSea) {
+      window.__soundingSea.spray = { level: Number(sprayLevel.toFixed(4)) };
+    }
+
     if (metersEl) {
       const display =
         setWave.active > 0.15
@@ -554,6 +575,7 @@ export async function bootSeaStage(mount, params) {
       surfaceProbe.dispose();
       heightProbe.dispose();
       buoy?.dispose();
+      buoySpray?.dispose();
       dem?.dispose();
       terrain?.dispose();
       renderer.dispose();
