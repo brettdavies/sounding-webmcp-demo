@@ -12,6 +12,13 @@ import {
   logViewVerification,
   verifyMavericksViews,
 } from './mavericks-views-verify.js';
+import {
+  TERRAIN_STRIDE,
+  auditDemMesh,
+  terrainSegmentsForGrid,
+} from './mavericks-dem-audit.js';
+
+export { TERRAIN_STRIDE } from './mavericks-dem-audit.js';
 
 /**
  * @typedef {{
@@ -86,6 +93,7 @@ async function loadTex(url, opts = {}) {
  *   pins: import('./mavericks-pins.js').MavericksPins,
  *   views: ReturnType<typeof buildViewsForPins>,
  *   viewVerify: ReturnType<typeof verifyMavericksViews>,
+ *   demAudit: ReturnType<typeof auditDemMesh>,
  *   dispose: () => void,
  * }>}
  */
@@ -106,11 +114,11 @@ export async function loadMavericksTerrain(metaIn, heightsIn) {
     heights = new Float32Array(buf);
   }
   const { rows, cols, pixel_m: pixelM } = meta;
-  if (heights.length !== rows * cols) {
-    throw new Error(
-      `[mavericks] height size ${heights.length} ≠ ${rows * cols}`,
-    );
+  const demAudit = auditDemMesh(heights, meta, TERRAIN_STRIDE);
+  if (!demAudit.ok) {
+    throw new Error(`[mavericks] DEM audit failed: ${JSON.stringify(demAudit)}`);
   }
+  console.info('[mavericks] dem audit', demAudit);
 
   const [albedo, masks, cliffDiff, cliffNor, seaDiff, seaNor] =
     await Promise.all([
@@ -135,13 +143,15 @@ export async function loadMavericksTerrain(metaIn, heightsIn) {
 
   const widthM = (cols - 1) * pixelM;
   const depthM = (rows - 1) * pixelM;
-  const geo = new THREE.PlaneGeometry(widthM, depthM, cols - 1, rows - 1);
+  const { segX, segZ } = terrainSegmentsForGrid(rows, cols, TERRAIN_STRIDE);
+  const geo = new THREE.PlaneGeometry(widthM, depthM, segX, segZ);
   geo.rotateX(-Math.PI / 2);
 
   const pos = geo.attributes.position;
+  const stride = TERRAIN_STRIDE;
   for (let i = 0; i < pos.count; i++) {
-    const col = i % cols;
-    const row = (i / cols) | 0;
+    const col = (i % (segX + 1)) * stride;
+    const row = ((i / (segX + 1)) | 0) * stride;
     pos.setY(i, heights[row * cols + col]);
   }
   pos.needsUpdate = true;
@@ -210,6 +220,7 @@ export async function loadMavericksTerrain(metaIn, heightsIn) {
     pins,
     views,
     viewVerify: report,
+    demAudit,
     dispose() {
       geo.dispose();
       mat.dispose();

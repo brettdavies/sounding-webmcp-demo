@@ -38,7 +38,7 @@ One evidence-gated commit; no behavior change — rename only. Update glossary
 
 ### P0b — Cliff / terrain fidelity (blocks perf work that touches land)
 
-- [ ] **`terrainStride: 1` only** — remove or ban any terrain subsampling LOD
+- [x] **`terrainStride: 1` only** — remove or ban any terrain subsampling LOD
 - [ ] Cliffs in `fallaway`, `cliff`, `shore`, `reef` match reference photos (near-vertical, not melted hills)
 - [ ] Optional seated cliff GLBs on steep mask cells — enhancement only, DEM geometry unchanged underneath
 - [ ] Cliff QA captures in manifest before any ocean perf tier ships
