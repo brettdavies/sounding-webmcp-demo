@@ -7,23 +7,63 @@
   "utm_zone": 10,
   "datum": "NAVD88",
   "source": "USGS DS684 DEM_1 Half Moon Bay",
-  "pillar_easting": 544490.1367044549,
-  "pillar_northing": 4149850.0999625884,
+  "source_doi": "10.3133/ds684",
+  "source_url": "https://pubs.usgs.gov/ds/684/",
+  "frame": {
+    "name": "local_xz_m",
+    "note": "Grid NW corner at origin_easting/northing. Local origin at grid center. +X east, +Z north (increasing northing), +Y NAVD88 up. Three.js mesh: PlaneGeometry centered at origin; row 0 → local Z = +half_span.",
+    "half_span_m": 1998.0,
+    "formulas": {
+      "col": "(local_x + half_span_m) / pixel_m",
+      "row": "(half_span_m - local_z) / pixel_m",
+      "easting": "origin_easting + col * pixel_m",
+      "northing": "origin_northing - row * pixel_m"
+    }
+  },
+  "bounds_wgs84": {
+    "crs": "EPSG:4326",
+    "nw": { "lat": 37.512638, "lon": -122.51921 },
+    "ne": { "lat": 37.512445, "lon": -122.473996 },
+    "sw": { "lat": 37.476621, "lon": -122.519441 },
+    "se": { "lat": 37.476428, "lon": -122.474248 }
+  },
+  "crop_in_dem_1": {
+    "note": "Stage grid is a 4 m resample of USGS DS684 DEM_1 (native 2 m). NW corner in full DEM_1 UTM 10N.",
+    "dem_1_origin_easting": 536484.0,
+    "dem_1_origin_northing": 4154252.0,
+    "dem_1_pixel_m": 2.0,
+    "col_offset_2m": 3003,
+    "row_offset_2m": 1200
+  },
+  "tide_datums_noaa_9414131": {
+    "station": "Pillar Point Harbor",
+    "station_id": "9414131",
+    "vertical_datum": "NAVD88",
+    "epoch": "1983-2001",
+    "api": "https://api.tidesandcurrents.noaa.gov/mdapi/prod/webapi/stations/9414131/datums.json",
+    "mllw_m": 0.012,
+    "msl_m": 0.924,
+    "mhhw_m": 1.719,
+    "stage_still_water_m": 1.719,
+    "note": "Stage still-water plane uses MHHW (fills troughs without draining cliff-toe shelf)."
+  },
+  "pillar_easting": 544306.0,
+  "pillar_northing": 4150176.0,
   "z_min": -36.970001220703125,
   "z_max": 112.12699890136719,
   "pillar_local": {
     "x": -182.0,
-    "z": -322.0
+    "z": 322.0
   },
   "pillar_elev_m": 48.645809173583984,
   "station_local": {
     "x": -182.0,
-    "z": -322.0,
+    "z": 322.0,
     "y": 48.645809173583984
   },
   "break_line": {
     "frame": "local_xz_m",
-    "note": "Plan-view crest / break polyline for Mavericks heat faces. Stage still-water plane uses MHHW fill Y≈1.72 m NAVD88 (harbor MSL≈0.92).",
+    "note": "Plan-view reef **crest line** / break polyline for **set waves** at Mavericks. Stage **still-water plane** uses MHHW fill Y = 1.719 m NAVD88 (harbor MSL = 0.924).",
     "source": [
       ".context/pictures/1787862950_pillar-point-diagram.jpg (Waves Break Here)",
       ".context/pictures/1787862980_wave-energy.jpeg (reef focus / refraction)",
@@ -34,13 +74,13 @@
     "depth_band_m": [-6.5, -4.5],
     "rocks": {
       "x": -338,
-      "z": 197,
-      "note": "Sail Rock / diagram Rocks pin"
+      "z": -197,
+      "note": "Sail Rock — USCG 37°29′34″N 122°30′02″W → local (−338, −197); DEM h≈1.1 m NAVD88"
     },
     "peak": {
       "x": -440,
       "z": -20,
-      "note": "Main crest focus (Corner-ish) — solitary faces aim here"
+      "note": "Main reef **break peak** (Corner-ish) — **set waves** and buoy aim here; DEM h ≈ −4.7 m"
     },
     "polyline": [
       { "x": -480, "z": 100 },
@@ -52,13 +92,25 @@
   },
   "spectators": {
     "frame": "local_xz_m",
-    "note": "Beach - Spectators from pillar-point-diagram.jpg: dry sand on the harbor-facing toe east of the tip (above MHHW stage fill), eye ~2.5 m, looking west to the break.",
+    "note": "Harbor-facing dry sand east of the tip (above MHHW stage fill). DEM ground ≈3.0 m at this pin; eye ~2.5 m → camera Y≈5.5 m.",
     "x": -100,
-    "z": -100,
-    "ground_y": 3.0,
+    "z": 100,
+    "ground_y": 2.962,
     "eye_height_m": 2.5,
     "look_at": { "x": -440, "y": 6, "z": -20 }
   },
   "albedo": "NAIP 2022 + Poly Haven cliff/rock bake",
-  "ortho": "CA DFW NAIP_2022 ImageServer export"
+  "ortho": "CA DFW NAIP_2022 ImageServer export",
+  "ortho_pixels": { "width": 1024, "height": 1024 },
+  "albedo_pixels": { "width": 1000, "height": 1000, "note": "Resampled to DEM grid (4 m/post)" },
+  "reconciliation_2026_08_27": {
+    "issue": "Several pins had inverted local Z (Three.js +Z = north) or UTM that did not match DEM samples.",
+    "fixes": [
+      "station/pillar z −322 → +322 (DEM plateau 48.65 m at UTM 544306, 4150176)",
+      "pillar_easting/northing → plateau cell (was reef shoal at ~−0.2 m)",
+      "break_line.rocks z +197 → −197 (USCG Sail Rock WGS84)",
+      "spectators z −100 → +100 (dry sand ~3 m; old pin was ~−1.2 m subtidal)"
+    ],
+    "unchanged": ["break_line.peak", "break_line.polyline — already on −5…−6 m reef band"]
+  }
 }
