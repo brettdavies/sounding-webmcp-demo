@@ -25,6 +25,10 @@ import {
   setWaveDisplacementAt,
 } from './set-wave.js';
 import { verifyCurvedCrestOnPolyline } from './break-line-crest.js';
+import {
+  verifyBreakStyleDistribution,
+  STAGE_BREAK_SEED,
+} from './break-style.js';
 import { loadEnvironment } from './land.js';
 import {
   MAVERICKS_VIEWS,
@@ -244,13 +248,24 @@ export async function bootSeaStage(mount, params) {
   reading.swell.direction_deg = reading.swell.direction_deg ?? swellFrom;
   const breakPolyline =
     terrain?.pins?.polyline ?? metaBundle?.pins?.polyline ?? [];
-  const setWaveSchedule = buildSetWaveSchedule(reading, buoyXz, breakPolyline);
+  const breakSeed = Number(params.get('seed')) || STAGE_BREAK_SEED;
+  const setWaveSchedule = buildSetWaveSchedule(
+    reading,
+    buoyXz,
+    breakPolyline,
+    breakSeed,
+  );
   const crestLine = verifyCurvedCrestOnPolyline(
     breakPolyline,
     setWaveSchedule.buoyAlong,
     setWaveSchedule.dir,
   );
+  const breakStyles = verifyBreakStyleDistribution(
+    setWaveSchedule.events,
+    setWaveSchedule.seed,
+  );
   console.info('[mavericks] curved crest line', crestLine);
+  console.info('[mavericks] break styles', breakStyles);
   let currentView = viewName;
 
   /** @param {string} name */
@@ -275,6 +290,7 @@ export async function bootSeaStage(mount, params) {
     demAudit: terrain?.demAudit ?? null,
     cliffQa: terrain?.cliffQa ?? null,
     crestLine,
+    breakStyles,
     mslY,
     buoyXz,
     ready: false,
@@ -393,10 +409,14 @@ export async function bootSeaStage(mount, params) {
             ? 'tween'
             : setWave.label || 'face'
           : 'swell';
-      waveEl.textContent = `${tag} ${faceM} m · ${setWave.periodS} s · ${setWave.directionDeg}° · ${currentView}`;
+      const styleTag =
+        setWave.active > 0.08 && setWave.kind === 'set'
+          ? ` · ${setWave.breakStyle}`
+          : '';
+      waveEl.textContent = `${tag}${styleTag} ${faceM} m · ${setWave.periodS} s · ${setWave.directionDeg}° · ${currentView}`;
     }
     if (asOfEl && setWave.active > 0.2 && setWave.kind === 'set') {
-      asOfEl.textContent = `heat · ${setWave.label} · rolling`;
+      asOfEl.textContent = `heat · ${setWave.label} · ${setWave.breakStyle}`;
     } else if (asOfEl && setWave.active > 0.2 && setWave.kind === 'tween') {
       asOfEl.textContent = `heat · smaller between`;
     } else if (asOfEl && reading.as_of_local) {

@@ -46,7 +46,7 @@ One evidence-gated commit; no behavior change — rename only. Update glossary
 ### P1 — Set-wave readability & break shape
 
 - [x] Curved crest along `break_line.polyline`
-- [ ] Per-wave **break style** (spill / plunge / tube)
+- [x] Per-wave **break style** (spill / plunge / tube)
 - [ ] Lip/foam Jacobian visible; tube read on bombs
 - [ ] Overlay view + wave tag consistent
 

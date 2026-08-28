@@ -10,10 +10,16 @@ import {
   MAX_BREAK_LINE_VERTS,
   normalizeBreakPolyline,
 } from './break-line-crest.js';
+import {
+  assignBreakStyle,
+  breakStyleParams,
+  BREAK_STYLE_INDEX,
+  STAGE_BREAK_SEED,
+} from './break-style.js';
 
 const G = 9.81;
 
-/** @typedef {{ tPeak: number, face_m: number, label: string, kind: 'set' | 'lull' | 'tween' }} SetWaveEvent */
+/** @typedef {{ tPeak: number, face_m: number, label: string, kind: 'set' | 'lull' | 'tween', breakStyle: import('./break-style.js').BreakStyle }} SetWaveEvent */
 
 /**
  * @param {{
@@ -25,8 +31,9 @@ const G = 9.81;
  * }} reading
  * @param {{ x: number, z: number }} [mooring]
  * @param {{ x: number, z: number }[]} [polyline]
+ * @param {number} [seed]
  */
-export function buildSetWaveSchedule(reading, mooring = BUOY_XZ, polyline = []) {
+export function buildSetWaveSchedule(reading, mooring = BUOY_XZ, polyline = [], seed = STAGE_BREAK_SEED) {
   const sets = reading.sets ?? [];
   const gapRange = reading.wave_gap_sec ?? [5, 7];
   const withinSetGap = (gapRange[0] + gapRange[1]) * 0.5;
@@ -46,7 +53,10 @@ export function buildSetWaveSchedule(reading, mooring = BUOY_XZ, polyline = []) 
       const face = faces[i];
       const kind = isLull ? 'lull' : 'set';
       const face_m = isLull ? Math.min(face, 8.5) : face;
-      events.push({ tPeak: t, face_m, label: set.label, kind });
+      /** @type {SetWaveEvent} */
+      const event = { tPeak: t, face_m, label: set.label, kind, breakStyle: 'spill' };
+      event.breakStyle = assignBreakStyle(event, events.length, seed);
+      events.push(event);
       t += withinSetGap;
 
       if (!isLull && i < faces.length - 1) {
@@ -56,6 +66,7 @@ export function buildSetWaveSchedule(reading, mooring = BUOY_XZ, polyline = []) 
           face_m: tweenFace,
           label: 'between',
           kind: 'tween',
+          breakStyle: 'spill',
         });
       }
     }
@@ -75,6 +86,7 @@ export function buildSetWaveSchedule(reading, mooring = BUOY_XZ, polyline = []) 
     dir,
     buoyAlong,
     polyline: normalizeBreakPolyline(polyline),
+    seed,
   };
 }
 
@@ -118,12 +130,24 @@ export function sampleSetWave(schedule, elapsed) {
   );
   const width = wavelength * (best.kind === 'set' ? 0.24 : 0.36);
   const crestAlong = schedule.buoyAlong + (t - best.tPeak) * phaseSpeed;
+  const breakStyle = best.breakStyle ?? 'spill';
+  const style = breakStyleParams(breakStyle);
+  const styledSteepness = Math.min(
+    steepness * style.steepMul,
+    1.15 / Math.max(k * amplitude, 1e-4),
+  );
+  const styledWidth = width * style.widthMul;
 
   return {
     active: temporal,
     face_m: best.face_m,
     label: best.label,
     kind: best.kind,
+    breakStyle,
+    breakStyleIndex: BREAK_STYLE_INDEX[breakStyle],
+    lipSkew: style.lipSkew,
+    tubeMix: style.tubeMix,
+    horizMul: style.horizMul,
     tPeak: best.tPeak,
     loopT: t,
     directionDeg: schedule.directionDeg,
@@ -132,8 +156,8 @@ export function sampleSetWave(schedule, elapsed) {
     k,
     omega,
     amplitude,
-    steepness,
-    width,
+    steepness: styledSteepness,
+    width: styledWidth,
     crestAlong,
   };
 }
@@ -155,6 +179,11 @@ function idleSetWave(schedule, event = null) {
     steepness: 0,
     width: 200,
     crestAlong: schedule.buoyAlong,
+    breakStyle: 'spill',
+    breakStyleIndex: 0,
+    lipSkew: 0,
+    tubeMix: 0,
+    horizMul: 1,
   };
 }
 
@@ -192,9 +221,13 @@ export function setWaveDisplacementAt(setWave, x, z, schedule) {
   const sinP = Math.sin(phase);
   const cosP = Math.cos(phase);
   const amp = setWave.amplitude * mix;
-  out.x = -setWave.dir.x * setWave.steepness * amp * sinP;
-  out.y = amp * cosP;
-  out.z = -setWave.dir.y * setWave.steepness * amp * sinP;
+  const horiz = setWave.horizMul ?? 1;
+  const lip = setWave.lipSkew ?? 0;
+  const phaseLip = setWave.k * xi + lip * sinP;
+  const tube = (setWave.tubeMix ?? 0) * mix * Math.sin(phaseLip * 2 + 1.4);
+  out.x = -setWave.dir.x * setWave.steepness * amp * sinP * horiz;
+  out.y = amp * cosP + tube;
+  out.z = -setWave.dir.y * setWave.steepness * amp * sinP * horiz;
   return out;
 }
 
@@ -241,6 +274,10 @@ export function applySetWaveUniforms(material, setWave, schedule) {
   u.setWaveSteepness.value = setWave.steepness;
   u.setWaveK.value = setWave.k;
   u.setWaveWidth.value = setWave.width;
+  u.setWaveBreakStyle.value = setWave.breakStyleIndex ?? 0;
+  u.setWaveLipSkew.value = setWave.lipSkew ?? 0;
+  u.setWaveTubeMix.value = setWave.tubeMix ?? 0;
+  u.setWaveHorizMul.value = setWave.horizMul ?? 1;
   u.setWaveCrestAlong.value = setWave.crestAlong;
   u.setWaveBuoyAlong.value = schedule?.buoyAlong ?? 0;
   u.setWaveDirection.value.set(setWave.dir.x, setWave.dir.y);

@@ -18,6 +18,10 @@ export const OCEAN_WAVE_DISPLACEMENT_GLSL = `
       uniform float setWaveSteepness;
       uniform float setWaveK;
       uniform float setWaveWidth;
+      uniform float setWaveBreakStyle;
+      uniform float setWaveLipSkew;
+      uniform float setWaveTubeMix;
+      uniform float setWaveHorizMul;
       uniform float setWaveCrestAlong;
       uniform float setWaveBuoyAlong;
       uniform vec2 setWaveDirection;
@@ -94,10 +98,13 @@ export const OCEAN_WAVE_DISPLACEMENT_GLSL = `
         float sinP = sin(phase);
         float cosP = cos(phase);
         float amp = setWaveAmplitude * mixW;
+        float phaseLip = phase + setWaveLipSkew * sinP;
+        float tubeHollow = setWaveTubeMix * mixW * sin(phaseLip * 2.0 + 1.4);
+        float horiz = setWaveHorizMul;
         total += vec3(
-          -setWaveDirection.x * setWaveSteepness * amp * sinP,
-          amp * cosP,
-          -setWaveDirection.y * setWaveSteepness * amp * sinP
+          -setWaveDirection.x * setWaveSteepness * amp * sinP * horiz,
+          amp * cosP + tubeHollow,
+          -setWaveDirection.y * setWaveSteepness * amp * sinP * horiz
         );
         return total;
       }
@@ -109,6 +116,10 @@ export const OCEAN_DISPLACEMENT_UNIFORM_KEYS = [
   "setWaveSteepness",
   "setWaveK",
   "setWaveWidth",
+  "setWaveBreakStyle",
+  "setWaveLipSkew",
+  "setWaveTubeMix",
+  "setWaveHorizMul",
   "setWaveCrestAlong",
   "setWaveBuoyAlong",
   "setWaveDirection",
@@ -194,6 +205,10 @@ export function createOceanMaterial(cascades, options) {
     setWaveSteepness: { value: 0 },
     setWaveK: { value: 0.05 },
     setWaveWidth: { value: 80 },
+    setWaveBreakStyle: { value: 0 },
+    setWaveLipSkew: { value: 0 },
+    setWaveTubeMix: { value: 0 },
+    setWaveHorizMul: { value: 1 },
     setWaveCrestAlong: { value: 0 },
     setWaveBuoyAlong: { value: 0 },
     setWaveDirection: { value: new THREE.Vector2(1, 0) },
@@ -252,7 +267,7 @@ export function createOceanMaterial(cascades, options) {
         float dy_dAlong =
           dAmp * cosP - amp * setWaveK * sinP;
         float horizontal =
-          -setWaveSteepness * (dAmp * sinP + amp * setWaveK * cosP);
+          -setWaveSteepness * setWaveHorizMul * (dAmp * sinP + amp * setWaveK * cosP);
         return vec3(
           setWaveDirection.x * dy_dAlong + setWaveDirection.x * horizontal * 0.25,
           0.0,
@@ -419,7 +434,8 @@ export function createOceanMaterial(cascades, options) {
           clamp((foamThreshold - displacementA.a) * foamScale, 0.0, 1.0) +
           clamp((foamThreshold - displacementB.a) * foamScale, 0.0, 1.0);
         float setWaveFoam = smoothstep(4.0, 12.0, setWaveHeightVarying) * setWaveActive * 0.45;
-        float foamCoverage = smoothstep(0.2, 0.9, foamRaw + setWaveFoam);
+        float styleFoam = setWaveBreakStyle * 0.08 + setWaveTubeMix * 0.35;
+        float foamCoverage = smoothstep(0.2, 0.9, foamRaw + setWaveFoam + styleFoam * setWaveActive);
 
         if (debugMode == 1) {
           vec3 bands =
