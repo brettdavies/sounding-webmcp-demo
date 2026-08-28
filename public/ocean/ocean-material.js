@@ -11,15 +11,15 @@ const skyFunction = `
   }
 `;
 
-/** Shared wave displacement (FFT scale + ambient swell + heat face). Used by ocean mesh + buoy probe. */
+/** Shared wave displacement (FFT scale + ambient swell + set-wave face). Used by ocean mesh + buoy probe. */
 export const OCEAN_WAVE_DISPLACEMENT_GLSL = `
-      uniform float heatActive;
-      uniform float heatAmplitude;
-      uniform float heatSteepness;
-      uniform float heatK;
-      uniform float heatWidth;
-      uniform float heatCrestAlong;
-      uniform vec2 heatDirection;
+      uniform float setWaveActive;
+      uniform float setWaveAmplitude;
+      uniform float setWaveSteepness;
+      uniform float setWaveK;
+      uniform float setWaveWidth;
+      uniform float setWaveCrestAlong;
+      uniform vec2 setWaveDirection;
       uniform float cascadeScale;
       uniform float swellAmplitude;
       uniform float swellSteepness;
@@ -49,36 +49,36 @@ export const OCEAN_WAVE_DISPLACEMENT_GLSL = `
           + gerstnerWave(xz, swell2Direction, swell2Amplitude, swell2Steepness, swell2K, swell2Omega, time);
       }
 
-      vec3 heatDisplacement(vec2 xz) {
+      vec3 setWaveDisplacement(vec2 xz) {
         vec3 total = ambientSwell(xz);
-        if (heatActive < 0.01 || heatAmplitude < 0.01) {
+        if (setWaveActive < 0.01 || setWaveAmplitude < 0.01) {
           return total;
         }
-        float along = dot(xz, heatDirection);
-        float xi = along - heatCrestAlong;
-        float env = exp(-(xi * xi) / max(heatWidth * heatWidth, 1.0));
-        float mixW = heatActive * env;
-        float phase = heatK * xi;
+        float along = dot(xz, setWaveDirection);
+        float xi = along - setWaveCrestAlong;
+        float env = exp(-(xi * xi) / max(setWaveWidth * setWaveWidth, 1.0));
+        float mixW = setWaveActive * env;
+        float phase = setWaveK * xi;
         float sinP = sin(phase);
         float cosP = cos(phase);
-        float amp = heatAmplitude * mixW;
+        float amp = setWaveAmplitude * mixW;
         total += vec3(
-          -heatDirection.x * heatSteepness * amp * sinP,
+          -setWaveDirection.x * setWaveSteepness * amp * sinP,
           amp * cosP,
-          -heatDirection.y * heatSteepness * amp * sinP
+          -setWaveDirection.y * setWaveSteepness * amp * sinP
         );
         return total;
       }
 `;
 
 export const OCEAN_DISPLACEMENT_UNIFORM_KEYS = [
-  "heatActive",
-  "heatAmplitude",
-  "heatSteepness",
-  "heatK",
-  "heatWidth",
-  "heatCrestAlong",
-  "heatDirection",
+  "setWaveActive",
+  "setWaveAmplitude",
+  "setWaveSteepness",
+  "setWaveK",
+  "setWaveWidth",
+  "setWaveCrestAlong",
+  "setWaveDirection",
   "cascadeScale",
   "swellAmplitude",
   "swellSteepness",
@@ -145,15 +145,15 @@ export function createOceanMaterial(cascades, options) {
     fogColor: { value: new THREE.Color(0x9fb8cc) },
     fogDensity: { value: 0.0045 },
     debugMode: { value: 0 },
-    // Hybrid heat face (Phase 4) — solitary Gerstner overlay on the cascade.
-    heatActive: { value: 0 },
-    heatAmplitude: { value: 0 },
-    heatSteepness: { value: 0 },
-    heatK: { value: 0.05 },
-    heatWidth: { value: 80 },
-    heatCrestAlong: { value: 0 },
-    heatDirection: { value: new THREE.Vector2(1, 0) },
-    /** Scales FFT displacement (duck ambient chop while a heat face owns the shot). */
+    // Set-wave overlay (Phase 4) — solitary Gerstner pulse on the cascade.
+    setWaveActive: { value: 0 },
+    setWaveAmplitude: { value: 0 },
+    setWaveSteepness: { value: 0 },
+    setWaveK: { value: 0.05 },
+    setWaveWidth: { value: 80 },
+    setWaveCrestAlong: { value: 0 },
+    setWaveDirection: { value: new THREE.Vector2(1, 0) },
+    /** Scales FFT displacement (duck ambient chop while a set wave owns the shot). */
     cascadeScale: { value: 1 },
     // Always-on long Pacific swell (Gerstner) — the readable in-between sea.
     swellAmplitude: { value: 0.85 },
@@ -183,33 +183,33 @@ export function createOceanMaterial(cascades, options) {
     demClipEnabled: { value: dem ? 1 : 0 },
   };
 
-  const heatGerstnerGlsl = `
+  const setWaveGerstnerGlsl = `
       ${OCEAN_WAVE_DISPLACEMENT_GLSL}
 
-      vec3 heatNormalDelta(vec2 xz) {
-        // Approximate slopes from primary heat face only (ambient is low-frequency).
-        if (heatActive < 0.01 || heatAmplitude < 0.01) {
+      vec3 setWaveNormalDelta(vec2 xz) {
+        // Approximate slopes from primary set-wave face only (ambient is low-frequency).
+        if (setWaveActive < 0.01 || setWaveAmplitude < 0.01) {
           return vec3(0.0);
         }
-        float along = dot(xz, heatDirection);
-        float xi = along - heatCrestAlong;
-        float width2 = max(heatWidth * heatWidth, 1.0);
+        float along = dot(xz, setWaveDirection);
+        float xi = along - setWaveCrestAlong;
+        float width2 = max(setWaveWidth * setWaveWidth, 1.0);
         float env = exp(-(xi * xi) / width2);
-        float mixW = heatActive * env;
-        float phase = heatK * xi;
+        float mixW = setWaveActive * env;
+        float phase = setWaveK * xi;
         float sinP = sin(phase);
         float cosP = cos(phase);
-        float amp = heatAmplitude * mixW;
+        float amp = setWaveAmplitude * mixW;
         float dEnv = env * (-2.0 * xi / width2);
-        float dAmp = heatAmplitude * heatActive * dEnv;
+        float dAmp = setWaveAmplitude * setWaveActive * dEnv;
         float dy_dAlong =
-          dAmp * cosP - amp * heatK * sinP;
+          dAmp * cosP - amp * setWaveK * sinP;
         float horizontal =
-          -heatSteepness * (dAmp * sinP + amp * heatK * cosP);
+          -setWaveSteepness * (dAmp * sinP + amp * setWaveK * cosP);
         return vec3(
-          heatDirection.x * dy_dAlong + heatDirection.x * horizontal * 0.25,
+          setWaveDirection.x * dy_dAlong + setWaveDirection.x * horizontal * 0.25,
           0.0,
-          heatDirection.y * dy_dAlong + heatDirection.y * horizontal * 0.25
+          setWaveDirection.y * dy_dAlong + setWaveDirection.y * horizontal * 0.25
         );
       }
 
@@ -242,9 +242,9 @@ export function createOceanMaterial(cascades, options) {
       uniform float time;
       out vec3 worldPositionVarying;
       out vec2 oceanPosition;
-      out float heatHeightVarying;
+      out float setWaveHeightVarying;
 
-      ${heatGerstnerGlsl}
+      ${setWaveGerstnerGlsl}
 
       vec4 sampleDisplacement(sampler2D map, vec2 xz, float lengthScale) {
         return texture(map, fract(xz / lengthScale));
@@ -257,10 +257,10 @@ export function createOceanMaterial(cascades, options) {
           sampleDisplacement(displacement1, oceanPosition, patchLengths.y).xyz +
           sampleDisplacement(displacement2, oceanPosition, patchLengths.z).xyz) *
           cascadeScale;
-        vec3 gerstner = heatDisplacement(oceanPosition);
-        // heatDisplacement includes ambient swell; isolate crest height for foam.
+        vec3 gerstner = setWaveDisplacement(oceanPosition);
+        // setWaveDisplacement includes ambient swell; isolate crest height for foam.
         vec3 ambient = ambientSwell(oceanPosition);
-        heatHeightVarying = max(0.0, gerstner.y - ambient.y);
+        setWaveHeightVarying = max(0.0, gerstner.y - ambient.y);
         vec3 displaced = position + displacement + gerstner;
         vec4 world = modelMatrix * vec4(displaced, 1.0);
         worldPositionVarying = world.xyz;
@@ -293,11 +293,11 @@ export function createOceanMaterial(cascades, options) {
       uniform int debugMode;
       in vec3 worldPositionVarying;
       in vec2 oceanPosition;
-      in float heatHeightVarying;
+      in float setWaveHeightVarying;
       out vec4 outputColor;
 
       ${skyFunction}
-      ${heatGerstnerGlsl}
+      ${setWaveGerstnerGlsl}
 
       float hash21(vec2 point) {
         point = fract(point * vec2(123.34, 456.21));
@@ -344,8 +344,8 @@ export function createOceanMaterial(cascades, options) {
           1.0,
           -derivative.y / denominatorZ
         ));
-        vec3 heatDelta = heatNormalDelta(oceanPosition);
-        normal = normalize(normal - vec3(heatDelta.x, 0.0, heatDelta.z) * 0.55);
+        vec3 setWaveDelta = setWaveNormalDelta(oceanPosition);
+        normal = normalize(normal - vec3(setWaveDelta.x, 0.0, setWaveDelta.z) * 0.55);
 
         vec2 detailA = texture(
           detailTexture,
@@ -371,8 +371,8 @@ export function createOceanMaterial(cascades, options) {
         float foamRaw =
           clamp((foamThreshold - displacementA.a) * foamScale, 0.0, 1.0) +
           clamp((foamThreshold - displacementB.a) * foamScale, 0.0, 1.0);
-        float heatFoam = smoothstep(4.0, 12.0, heatHeightVarying) * heatActive * 0.45;
-        float foamCoverage = smoothstep(0.2, 0.9, foamRaw + heatFoam);
+        float setWaveFoam = smoothstep(4.0, 12.0, setWaveHeightVarying) * setWaveActive * 0.45;
+        float foamCoverage = smoothstep(0.2, 0.9, foamRaw + setWaveFoam);
 
         if (debugMode == 1) {
           vec3 bands =

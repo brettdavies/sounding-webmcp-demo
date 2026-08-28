@@ -1,5 +1,5 @@
 /**
- * Hybrid Mavericks heat: solitary rolling faces on a calm long-swell cascade.
+ * Set-wave overlay: solitary rolling faces on a calm long-swell cascade.
  * Set structure: groups of big faces, smaller in-set waves, real lulls between sets.
  */
 import * as THREE from 'three';
@@ -7,7 +7,7 @@ import { BUOY_XZ } from './sea-state.js';
 
 const G = 9.81;
 
-/** @typedef {{ tPeak: number, face_m: number, label: string, kind: 'set' | 'lull' | 'tween' }} HeatEvent */
+/** @typedef {{ tPeak: number, face_m: number, label: string, kind: 'set' | 'lull' | 'tween' }} SetWaveEvent */
 
 /**
  * @param {{
@@ -19,7 +19,7 @@ const G = 9.81;
  * }} reading
  * @param {{ x: number, z: number }} [mooring]
  */
-export function buildHeatSchedule(reading, mooring = BUOY_XZ) {
+export function buildSetWaveSchedule(reading, mooring = BUOY_XZ) {
   const sets = reading.sets ?? [];
   const gapRange = reading.wave_gap_sec ?? [5, 7];
   const withinSetGap = (gapRange[0] + gapRange[1]) * 0.5;
@@ -27,7 +27,7 @@ export function buildHeatSchedule(reading, mooring = BUOY_XZ) {
     reading.swell?.direction_deg ?? reading.wave?.direction_deg ?? 285;
   const periodS = reading.swell?.period_s ?? reading.wave?.period_s ?? 18;
 
-  /** @type {HeatEvent[]} */
+  /** @type {SetWaveEvent[]} */
   const events = [];
   let t = 4;
 
@@ -38,12 +38,10 @@ export function buildHeatSchedule(reading, mooring = BUOY_XZ) {
     for (let i = 0; i < faces.length; i += 1) {
       const face = faces[i];
       const kind = isLull ? 'lull' : 'set';
-      // Lull entries stay small; set faces are the bombs.
       const face_m = isLull ? Math.min(face, 8.5) : face;
       events.push({ tPeak: t, face_m, label: set.label, kind });
       t += withinSetGap;
 
-      // Smaller intervening wave inside a set (not during lull labels).
       if (!isLull && i < faces.length - 1) {
         const tweenFace = THREE.MathUtils.clamp(face * 0.42, 5.5, 8.5);
         events.push({
@@ -55,7 +53,6 @@ export function buildHeatSchedule(reading, mooring = BUOY_XZ) {
       }
     }
 
-    // Real breath between sets — empty sea, cascade only.
     t += isLull ? withinSetGap * 1.1 : withinSetGap * 2.4;
   }
 
@@ -74,10 +71,10 @@ export function buildHeatSchedule(reading, mooring = BUOY_XZ) {
 }
 
 /**
- * @param {ReturnType<typeof buildHeatSchedule>} schedule
+ * @param {ReturnType<typeof buildSetWaveSchedule>} schedule
  * @param {number} elapsed
  */
-export function sampleHeat(schedule, elapsed) {
+export function sampleSetWave(schedule, elapsed) {
   const t = ((elapsed % schedule.loopSec) + schedule.loopSec) % schedule.loopSec;
   let best = null;
   let bestDist = Infinity;
@@ -89,14 +86,13 @@ export function sampleHeat(schedule, elapsed) {
     }
   }
   if (!best) {
-    return idleHeat(schedule);
+    return idleSetWave(schedule);
   }
 
-  // Longer window so the face rolls through, not a spike.
   const halfWindow = best.kind === 'set' ? 4.2 : best.kind === 'tween' ? 2.8 : 3.2;
   const temporal = smoothPulse(bestDist, halfWindow);
   if (temporal < 0.01) {
-    return idleHeat(schedule, best);
+    return idleSetWave(schedule, best);
   }
 
   const wavelength =
@@ -134,7 +130,7 @@ export function sampleHeat(schedule, elapsed) {
   };
 }
 
-function idleHeat(schedule, event = null) {
+function idleSetWave(schedule, event = null) {
   return {
     active: 0,
     face_m: event?.face_m ?? 0,
@@ -161,36 +157,32 @@ function smoothPulse(dist, halfWindow) {
 }
 
 /**
- * @param {ReturnType<typeof sampleHeat>} heat
+ * @param {ReturnType<typeof sampleSetWave>} setWave
  * @param {number} x
  * @param {number} z
  * @returns {THREE.Vector3}
  */
-export function heatDisplacementAt(heat, x, z) {
+export function setWaveDisplacementAt(setWave, x, z) {
   const out = new THREE.Vector3();
-  if (heat.active < 0.01 || heat.amplitude < 0.01) return out;
+  if (setWave.active < 0.01 || setWave.amplitude < 0.01) return out;
 
-  const along = heat.dir.x * x + heat.dir.y * z;
-  const xi = along - heat.crestAlong;
-  const env = Math.exp(-(xi * xi) / Math.max(heat.width * heat.width, 1));
-  const mix = heat.active * env;
-  const phase = heat.k * xi;
+  const along = setWave.dir.x * x + setWave.dir.y * z;
+  const xi = along - setWave.crestAlong;
+  const env = Math.exp(-(xi * xi) / Math.max(setWave.width * setWave.width, 1));
+  const mix = setWave.active * env;
+  const phase = setWave.k * xi;
   const sinP = Math.sin(phase);
   const cosP = Math.cos(phase);
-  const amp = heat.amplitude * mix;
-  out.x = -heat.dir.x * heat.steepness * amp * sinP;
+  const amp = setWave.amplitude * mix;
+  out.x = -setWave.dir.x * setWave.steepness * amp * sinP;
   out.y = amp * cosP;
-  out.z = -heat.dir.y * heat.steepness * amp * sinP;
+  out.z = -setWave.dir.y * setWave.steepness * amp * sinP;
   return out;
 }
 
 /**
- * @param {THREE.ShaderMaterial} material
- * @param {ReturnType<typeof sampleHeat>} heat
- */
-/**
  * Ambient long-swell Gerstner (CPU) — matches ocean-material always-on swell.
- * @param {ReturnType<typeof buildHeatSchedule>} schedule
+ * @param {ReturnType<typeof buildSetWaveSchedule>} schedule
  * @param {number} time
  * @param {number} x
  * @param {number} z
@@ -219,22 +211,26 @@ export function ambientSwellAt(schedule, time, x, z) {
   return out;
 }
 
-export function applyHeatUniforms(material, heat, schedule) {
+/**
+ * @param {THREE.ShaderMaterial} material
+ * @param {ReturnType<typeof sampleSetWave>} setWave
+ * @param {ReturnType<typeof buildSetWaveSchedule>} schedule
+ */
+export function applySetWaveUniforms(material, setWave, schedule) {
   const u = material.uniforms;
-  u.heatActive.value = heat.active;
-  u.heatAmplitude.value = heat.amplitude;
-  u.heatSteepness.value = heat.steepness;
-  u.heatK.value = heat.k;
-  u.heatWidth.value = heat.width;
-  u.heatCrestAlong.value = heat.crestAlong;
-  u.heatDirection.value.set(heat.dir.x, heat.dir.y);
-  // Duck residual FFT while a face owns the frame.
+  u.setWaveActive.value = setWave.active;
+  u.setWaveAmplitude.value = setWave.amplitude;
+  u.setWaveSteepness.value = setWave.steepness;
+  u.setWaveK.value = setWave.k;
+  u.setWaveWidth.value = setWave.width;
+  u.setWaveCrestAlong.value = setWave.crestAlong;
+  u.setWaveDirection.value.set(setWave.dir.x, setWave.dir.y);
   const duck =
-    heat.kind === 'set'
-      ? THREE.MathUtils.lerp(1, 0.15, heat.active)
-      : heat.kind === 'tween'
-        ? THREE.MathUtils.lerp(1, 0.35, heat.active)
-        : THREE.MathUtils.lerp(1, 0.45, heat.active);
+    setWave.kind === 'set'
+      ? THREE.MathUtils.lerp(1, 0.15, setWave.active)
+      : setWave.kind === 'tween'
+        ? THREE.MathUtils.lerp(1, 0.35, setWave.active)
+        : THREE.MathUtils.lerp(1, 0.45, setWave.active);
   u.cascadeScale.value = duck;
 
   if (schedule) {

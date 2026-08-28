@@ -25,8 +25,8 @@ break** that varies wave-to-wave while staying geodetically grounded. Pins and p
 
 ### Baseline gap (`d0f7805`)
 
-- Set-wave overlay = **1D Gerstner** + crest position (`heatCrestAlong` until P0 rename) → reads as straight **crest
-  line** (should follow polyline)
+- Set-wave overlay = **1D Gerstner** + crest position (`setWaveCrestAlong`) → reads as straight **crest line** (should
+  follow polyline)
 - Foam = cascade Jacobian + set-wave threshold — no shore mask, no spray
 - No per-wave break style (spill / plunge / tube)
 
@@ -46,8 +46,8 @@ break** that varies wave-to-wave while staying geodetically grounded. Pins and p
 | **Land**             | DEM terrain, albedo, cliff materials, masks       | `public/land/mavericks/*`, `mavericks-terrain.js`                               | Tip ~49 m; reef bathymetry reads; **vertical cliff read** in hero views; fallaway holds |
 | **Water / datum**    | Still-water plane, tide fill, shoreline contact   | `sea-state.js` (still-water Y = MHHW; code `MSL_Y`), ocean mesh, shoreline clip | No dry shelf at cliff toe; no water on dry sand; MHHW documented                        |
 | **Background swell** | Spectral FFT cascade + long-period Gerstner sea   | `public/ocean/*`, `ocean-material.js`                                           | Near-flat between set waves; teal/dark read; Jacobian foam on reef                      |
-| **Set waves**        | Set structure, set-wave overlay, break focus      | `heat.js`, `mavericks-heat.json`, `meta.break_line`                             | Curved crest line; varied break styles; 5–7 s within set; 2 min heat loop               |
-| **Break & foam**     | Crest shape, curl/tube, spray, shore whitewash    | `ocean-material.js`, `heat.js`, future modules                                  | No straight infinite crest; foam pulses with sets; spray on bombs                       |
+| **Set waves**        | Set structure, set-wave overlay, break focus      | `set-wave.js`, `mavericks-heat.json`, `meta.break_line`                         | Curved crest line; varied break styles; 5–7 s within set; 2 min heat loop               |
+| **Break & foam**     | Crest shape, curl/tube, spray, shore whitewash    | `ocean-material.js`, `set-wave.js`, future modules                              | No straight infinite crest; foam pulses with sets; spray on bombs                       |
 | **Buoy**             | Model, mooring, heave/pitch/yaw, waterline, spray | `buoy.js`, `height-probe.js`, `BUOY_XZ`                                         | Tracks wave surface; never airborne; waterline on hull lip                              |
 | **Station**          | Radome, sheds, dish, mast on DEM plateau          | `mavericks-terrain.js`, optional GLBs                                           | Props at reconciled `station_local`; ~12 m dome                                         |
 | **Atmosphere**       | Sun, HDRI env, fog, exposure                      | HDRI, directional light                                                         | Shared radiance on ocean + cliffs                                                       |

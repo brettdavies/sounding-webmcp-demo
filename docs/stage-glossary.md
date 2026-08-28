@@ -40,7 +40,7 @@ and **rig** live here.
 | **Set**                 | A **group of waves** arriving in close succession, usually larger than the waves before and after.     | JSON `sets[]` blocks (`opener`, `main`, `closing`); each lists **face heights** for several waves in that set.                                                                                         |
 | **Lull**                | A quieter period **between sets** — smaller waves or relative calm.                                    | JSON sets labeled `lull`; shader returns to ambient sea with only background swell.                                                                                                                    |
 | **Within-set interval** | Time from one set wave to the next **inside the same set**.                                            | **5–7 s** (`wave_gap_sec`); not the longer breath between sets.                                                                                                                                        |
-| **Between-set breath**  | Pause after a set finishes before the next set builds.                                                 | Implemented as extra schedule gap after non-lull sets (~2.4× within-set gap in `heat.js` until P0 rename).                                                                                             |
+| **Between-set breath**  | Pause after a set finishes before the next set builds.                                                 | Implemented as extra schedule gap after non-lull sets (~2.4× within-set gap in `set-wave.js`).                                                                                                         |
 
 ---
 
@@ -143,7 +143,7 @@ The **scene graph** is a tree of objects the renderer draws each frame. Three.js
 | **UV**           | 2D coordinates mapping texture pixels onto geometry.                                      | DEM albedo 1:1 with height grid; tiled UVs on cliff detail overlay.                      |
 | **Normal map**   | Texture encoding surface micro-detail bump direction.                                     | Cliff `nor_gl` maps; ocean normals from FFT displacement derivatives.                    |
 | **Shader**       | GPU program computing color/position per pixel/vertex.                                    | `ocean-material.js` fragment/vertex GLSL; terrain `onBeforeCompile` cliff mix.           |
-| **Uniform**      | Named parameter passed from CPU to shader each frame.                                     | `time`, `heatActive`, `sunDirection`, cascade textures — updated in render loop.         |
+| **Uniform**      | Named parameter passed from CPU to shader each frame.                                     | `time`, `setWaveActive`, `sunDirection`, cascade textures — updated in render loop.      |
 | **HDRI**         | High-dynamic-range panoramic image used as sky/light source.                              | Poly Haven env map; shared sun direction on ocean + sky.                                 |
 | **IBL**          | Image-based lighting — ambient/reflection from HDRI.                                      | Layer panel toggle “HDRI IBL”; lights cliffs and buoy consistently.                      |
 | **Light**        | Scene illuminator (sun, ambient).                                                         | Directional sun + shadow map on terrain; ocean shares `sunDirection`.                    |
@@ -185,38 +185,37 @@ The **scene graph** is a tree of objects the renderer draws each frame. Three.js
 
 ## Ocean simulation (shader / mechanism)
 
-| Term                  | Definition                                                              | In this project                                                                                    |
-| --------------------- | ----------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
-| **Spectral cascade**  | FFT-based ocean: multiple wavelength bands summed on the GPU.           | `public/ocean/*` — ambient **background swell** texture; Jacobian foam history.                    |
-| **Gerstner wave**     | Analytic trochoidal wave — clean rolling crest for art-directed pulses. | **Set-wave overlay** (solitary Gerstner through buoy); always-on long swell layers.                |
-| **Set-wave overlay**  | Timed Gerstner pulse for one **scheduled set wave** in the heat loop.   | Driven by set-wave schedule (`heat.js` until P0 rename); uniforms `heatActive`, `heatAmplitude`, … |
-| **Displacement**      | GPU vertical offset of ocean surface mesh.                              | Must match CPU buoy height sample — no floating/sinking hull.                                      |
-| **Jacobian foam**     | Foam from surface folding (determinant of displacement Jacobian).       | Cascade whitewash on reef; complements lip foam on set waves.                                      |
-| **Choppiness**        | Horizontal displacement sharpening crests (Gerstner Q).                 | Moderate on set waves; low on background swell.                                                    |
-| **Still-water plane** | Flat reference Y for ocean mesh before displacement.                    | **MHHW** — avoids dry cliff shelf in troughs.                                                      |
-| **Shoreline clip**    | Mask excluding water displacement over dry land.                        | P0 — no water on DEM above MHHW shore wedge.                                                       |
+| Term                  | Definition                                                              | In this project                                                                     |
+| --------------------- | ----------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
+| **Spectral cascade**  | FFT-based ocean: multiple wavelength bands summed on the GPU.           | `public/ocean/*` — ambient **background swell** texture; Jacobian foam history.     |
+| **Gerstner wave**     | Analytic trochoidal wave — clean rolling crest for art-directed pulses. | **Set-wave overlay** (solitary Gerstner through buoy); always-on long swell layers. |
+| **Set-wave overlay**  | Timed Gerstner pulse for one **scheduled set wave** in the heat loop.   | Driven by `set-wave.js` schedule; uniforms `setWaveActive`, `setWaveAmplitude`, …   |
+| **Displacement**      | GPU vertical offset of ocean surface mesh.                              | Must match CPU buoy height sample — no floating/sinking hull.                       |
+| **Jacobian foam**     | Foam from surface folding (determinant of displacement Jacobian).       | Cascade whitewash on reef; complements lip foam on set waves.                       |
+| **Choppiness**        | Horizontal displacement sharpening crests (Gerstner Q).                 | Moderate on set waves; low on background swell.                                     |
+| **Still-water plane** | Flat reference Y for ocean mesh before displacement.                    | **MHHW** — avoids dry cliff shelf in troughs.                                       |
+| **Shoreline clip**    | Mask excluding water displacement over dry land.                        | P0 — no water on DEM above MHHW shore wedge.                                        |
 
 ---
 
 ## Code aliases (legacy)
 
-Repo code often prefixes **`heat`** for the set-wave overlay (historical naming). In **docs and UI copy**, prefer
-glossary terms above.
+Session-level identifiers keep **heat** where it means the whole contest loop (`mavericks-heat.json`, API copy
+`Mavericks heat — compressed`). Set-wave overlay code uses glossary terms below.
 
-| Code / identifier                | Preferred doc term                          |
-| -------------------------------- | ------------------------------------------- |
-| `heat.js`, `buildHeatSchedule`   | Set-wave schedule                           |
-| `HeatEvent`, `sampleHeat`        | Scheduled wave / set-wave sample            |
-| `heatActive`, `heatAmplitude`, … | Set-wave overlay uniforms                   |
-| `kind: 'set'`                    | Set wave (featured)                         |
-| `kind: 'tween'`                  | Tween wave                                  |
-| `kind: 'lull'`                   | Lull wave (small)                           |
-| `mavericks-heat.json`            | Heat loop data (session-level — name kept)  |
-| `face_m`                         | Face height (meters) — valid in data fields |
+| Code / identifier                      | Doc term                                    |
+| -------------------------------------- | ------------------------------------------- |
+| `set-wave.js`, `buildSetWaveSchedule`  | Set-wave schedule                           |
+| `SetWaveEvent`, `sampleSetWave`        | Scheduled wave / set-wave sample            |
+| `setWaveActive`, `setWaveAmplitude`, … | Set-wave overlay uniforms                   |
+| `kind: 'set'`                          | Set wave (featured)                         |
+| `kind: 'tween'`                        | Tween wave                                  |
+| `kind: 'lull'`                         | Lull wave (small)                           |
+| `mavericks-heat.json`                  | Heat loop data (session-level — name kept)  |
+| `face_m`                               | Face height (meters) — valid in data fields |
 
-**P0 backlog:** rename overlay/schedule identifiers — see
-[`stage-backlog.md`](stage-backlog.md#p0--glossary-code-rename-scope). Session file `mavericks-heat.json` keeps **heat**
-in the name (correct surf term for the whole loop).
+Renamed in P0 ([`stage-backlog.md`](stage-backlog.md#p0--glossary-code-rename-scope)). Session file
+`mavericks-heat.json` keeps **heat** in the name (correct surf term for the whole loop).
 
 ---
 

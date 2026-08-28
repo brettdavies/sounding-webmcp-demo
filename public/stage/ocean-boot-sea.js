@@ -1,5 +1,5 @@
 /**
- * Full sea stage on USGS DEM land: spectral ocean at MSL, heat faces at break peak.
+ * Full sea stage on USGS DEM land: spectral ocean at MHHW, set waves at break peak.
  * Loaded with ?focus=sea. Optional ?view=spectators|fallaway|reef|…
  */
 import * as THREE from 'three';
@@ -18,12 +18,12 @@ import {
 } from './surface-probe.js';
 import {
   ambientSwellAt,
-  applyHeatUniforms,
-  buildHeatSchedule,
+  applySetWaveUniforms,
+  buildSetWaveSchedule,
   fallbackReading,
-  heatDisplacementAt,
-  sampleHeat,
-} from './heat.js';
+  sampleSetWave,
+  setWaveDisplacementAt,
+} from './set-wave.js';
 import { loadEnvironment } from './land.js';
 import {
   MAVERICKS_VIEWS,
@@ -241,7 +241,7 @@ export async function bootSeaStage(mount, params) {
   }
   if (!reading.swell) reading.swell = {};
   reading.swell.direction_deg = reading.swell.direction_deg ?? swellFrom;
-  const heatSchedule = buildHeatSchedule(reading, buoyXz);
+  const setWaveSchedule = buildSetWaveSchedule(reading, buoyXz);
   let currentView = viewName;
 
   /** @param {string} name */
@@ -298,8 +298,8 @@ export async function bootSeaStage(mount, params) {
     lastTs = ts;
     elapsed += dt;
 
-    const heat = sampleHeat(heatSchedule, elapsed);
-    applyHeatUniforms(oceanMaterial, heat, heatSchedule);
+    const setWave = sampleSetWave(setWaveSchedule, elapsed);
+    applySetWaveUniforms(oceanMaterial, setWave, setWaveSchedule);
 
     oceanSystem.update(elapsed, dt);
     updateOceanMaterialTextures(oceanMaterial, oceanSystem.cascades);
@@ -322,8 +322,8 @@ export async function bootSeaStage(mount, params) {
         buoyXz.z,
       );
       const cascadeScale = oceanMaterial.uniforms.cascadeScale.value;
-      const face = heatDisplacementAt(heat, buoyXz.x, buoyXz.z);
-      const swell = ambientSwellAt(heatSchedule, elapsed, buoyXz.x, buoyXz.z);
+      const face = setWaveDisplacementAt(setWave, buoyXz.x, buoyXz.z);
+      const swell = ambientSwellAt(setWaveSchedule, elapsed, buoyXz.x, buoyXz.z);
       const cpuEta = cascade.y * cascadeScale + face.y + swell.y;
       const cpuDisp = new THREE.Vector3(
         cascade.x * cascadeScale + face.x + swell.x,
@@ -360,27 +360,27 @@ export async function bootSeaStage(mount, params) {
 
     if (metersEl) {
       const display =
-        heat.active > 0.15
-          ? Math.max(Math.abs(eta), heat.face_m * heat.active * 0.85)
+        setWave.active > 0.15
+          ? Math.max(Math.abs(eta), setWave.face_m * setWave.active * 0.85)
           : Math.max(0.1, Math.abs(eta));
       metersEl.textContent = display.toFixed(1);
     }
     if (waveEl) {
       const faceM =
-        heat.active > 0.08
-          ? heat.face_m.toFixed(1)
+        setWave.active > 0.08
+          ? setWave.face_m.toFixed(1)
           : Math.abs(eta).toFixed(1);
       const tag =
-        heat.active > 0.08
-          ? heat.kind === 'tween'
+        setWave.active > 0.08
+          ? setWave.kind === 'tween'
             ? 'tween'
-            : heat.label || 'face'
+            : setWave.label || 'face'
           : 'swell';
-      waveEl.textContent = `${tag} ${faceM} m · ${heat.periodS} s · ${heat.directionDeg}° · ${currentView}`;
+      waveEl.textContent = `${tag} ${faceM} m · ${setWave.periodS} s · ${setWave.directionDeg}° · ${currentView}`;
     }
-    if (asOfEl && heat.active > 0.2 && heat.kind === 'set') {
-      asOfEl.textContent = `heat · ${heat.label} · rolling`;
-    } else if (asOfEl && heat.active > 0.2 && heat.kind === 'tween') {
+    if (asOfEl && setWave.active > 0.2 && setWave.kind === 'set') {
+      asOfEl.textContent = `heat · ${setWave.label} · rolling`;
+    } else if (asOfEl && setWave.active > 0.2 && setWave.kind === 'tween') {
       asOfEl.textContent = `heat · smaller between`;
     } else if (asOfEl && reading.as_of_local) {
       asOfEl.textContent = reading.as_of_local;

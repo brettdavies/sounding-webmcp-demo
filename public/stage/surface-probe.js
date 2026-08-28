@@ -37,7 +37,7 @@ const fragmentShader = /* glsl */ `
        sampleDisplacement(displacement1, sampleXZ, patchLengths.y).xyz +
        sampleDisplacement(displacement2, sampleXZ, patchLengths.z).xyz) *
       cascadeScale;
-    vec3 gerstner = heatDisplacement(sampleXZ);
+    vec3 gerstner = setWaveDisplacement(sampleXZ);
     outputColor = vec4(cascade + gerstner, 1.0);
   }
 `;
@@ -51,13 +51,13 @@ function createProbeUniforms(patchLengths) {
     patchLengths: { value: new THREE.Vector3(...patchLengths) },
     time: { value: 0 },
     sampleXZ: { value: new THREE.Vector2() },
-    heatActive: { value: 0 },
-    heatAmplitude: { value: 0 },
-    heatSteepness: { value: 0 },
-    heatK: { value: 0.05 },
-    heatWidth: { value: 80 },
-    heatCrestAlong: { value: 0 },
-    heatDirection: { value: new THREE.Vector2(1, 0) },
+    setWaveActive: { value: 0 },
+    setWaveAmplitude: { value: 0 },
+    setWaveSteepness: { value: 0 },
+    setWaveK: { value: 0.05 },
+    setWaveWidth: { value: 80 },
+    setWaveCrestAlong: { value: 0 },
+    setWaveDirection: { value: new THREE.Vector2(1, 0) },
     cascadeScale: { value: 1 },
     swellAmplitude: { value: 0.85 },
     swellSteepness: { value: 0.18 },

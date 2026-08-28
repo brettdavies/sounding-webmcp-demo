@@ -1,7 +1,7 @@
 /**
  * Client sea-state for the spectral cascade.
  * Mavericks: long-period Pacific swell — organized, not North-Atlantic chop.
- * Giant faces are the hybrid heat overlay; cascade is a quiet in-between sea.
+ * Giant faces are the hybrid set-wave overlay; cascade is a quiet in-between sea.
  */
 import { PIN_FALLBACKS } from './mavericks-pins.js';
 
