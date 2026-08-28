@@ -9,6 +9,15 @@ import {
 } from './boot-placeholder.js';
 import { createBootPlaceholder } from './boot-placeholder-stage.js';
 import { createLayerPanel, verifyLayerControls } from './layer-controls.js';
+import {
+  sampleQualityRamp,
+  verifyQualityRamp,
+  SEGMENT_TIERS,
+} from './quality-ramp.js';
+import {
+  createOceanSystemAtResolution,
+  setOceanSegmentTier,
+} from './quality-ramp-ocean.js';
 import { SpectralOceanSystem } from '../ocean/ocean-system.js';
 import {
   createOceanMaterial,
@@ -79,7 +88,6 @@ import {
   DESIGN_CAMERA,
   MAVERICKS_SEA,
   MSL_Y,
-  OCEAN_SEGMENTS,
   OCEAN_SIZE,
   SUN_DIRECTION,
 } from './sea-state.js';
@@ -217,12 +225,16 @@ export async function bootSeaStage(mount, params) {
 
   const oceanSystem = new SpectralOceanSystem(renderer, {
     ...MAVERICKS_SEA,
+    resolution: 64,
   });
+  let activeOceanSystem = oceanSystem;
+  let currentFftResolution = 64;
+  let fftUpgradeDone = false;
 
   const detailTexture = createOceanDetailTexture(512, MAVERICKS_SEA.seed);
   const shoreCenter = pins.spectators ?? { x: -100, z: 100 };
   const reefPeak = pins.breakPeak ?? { x: -440, z: -20 };
-  const oceanMaterial = createOceanMaterial(oceanSystem.cascades, {
+  const oceanMaterial = createOceanMaterial(activeOceanSystem.cascades, {
     patchLengths: MAVERICKS_SEA.patchLengths,
     sunDirection,
     detailTexture,
@@ -234,17 +246,20 @@ export async function bootSeaStage(mount, params) {
     reefRadius: REEF_RADIUS_M,
     stillWaterY: mslY,
   });
-  oceanMaterial.uniforms.foamScale.value = 0.7;
+  const targetFoamScale = 0.7;
+  const targetDetailStrength = 0.006;
+  oceanMaterial.uniforms.foamScale.value = 0;
   oceanMaterial.uniforms.foamThreshold.value = 0.2;
-  oceanMaterial.uniforms.detailStrength.value = 0.006;
+  oceanMaterial.uniforms.detailStrength.value = 0;
   oceanMaterial.uniforms.fogDensity.value = 0.00125;
   oceanMaterial.uniforms.scatterColor.value.set(0x3aa0a0);
 
+  const bootSegments = SEGMENT_TIERS[0];
   const oceanGeometry = new THREE.PlaneGeometry(
     OCEAN_SIZE,
     OCEAN_SIZE,
-    OCEAN_SEGMENTS,
-    OCEAN_SEGMENTS,
+    bootSegments,
+    bootSegments,
   );
   oceanGeometry.rotateX(-Math.PI / 2);
   const oceanMesh = new THREE.Mesh(oceanGeometry, oceanMaterial);
@@ -354,6 +369,8 @@ export async function bootSeaStage(mount, params) {
   console.info('[mavericks] boot budget (pre-tick)', bootVerify);
   const layerVerify = verifyLayerControls();
   console.info('[mavericks] layer controls', layerVerify);
+  const qualityRampVerify = verifyQualityRamp();
+  console.info('[mavericks] quality ramp', qualityRampVerify);
 
   const publishBootState = () => {
     const budget = bootBudget.snapshot();
@@ -450,8 +467,8 @@ export async function bootSeaStage(mount, params) {
     oceanMaterial.uniforms.debugMode.value = Number(debugParam) || 0;
   }
 
-  const storedFoamScale = oceanMaterial.uniforms.foamScale.value;
-  const storedDetailStrength = oceanMaterial.uniforms.detailStrength.value;
+  const storedFoamScale = targetFoamScale;
+  const storedDetailStrength = targetDetailStrength;
   const storedSwell1 = oceanMaterial.uniforms.swellAmplitude.value;
   const storedSwell2 = oceanMaterial.uniforms.swell2Amplitude.value;
   const layerFlags = { fft: true, setWave: true, spray: true };
@@ -608,6 +625,8 @@ export async function bootSeaStage(mount, params) {
     ready: false,
     layers: layerPanel,
     placeholder: verifyPlaceholderBoot(bootBudget.snapshot()),
+    qualityRamp: sampleQualityRamp(0),
+    qualityRampVerify,
   };
   window.__soundingBoot = window.__soundingSea;
   console.info('[mavericks] boot budget', window.__soundingBoot.budget);
@@ -633,6 +652,10 @@ export async function bootSeaStage(mount, params) {
   const sprayState = { level: 0 };
   let bootSettled = false;
 
+  let rampElapsed = 0;
+  let currentSegments = bootSegments;
+  let rampSettled = false;
+
   const tick = (ts) => {
     if (disposed) return;
     if (placeholderActive) {
@@ -643,6 +666,31 @@ export async function bootSeaStage(mount, params) {
     const dt = Math.min((ts - lastTs) / 1000, 0.05);
     lastTs = ts;
     elapsed += dt;
+    rampElapsed += dt;
+    const ramp = sampleQualityRamp(rampElapsed);
+
+    if (ramp.segments !== currentSegments) {
+      setOceanSegmentTier(oceanMesh, ramp.segments);
+      currentSegments = ramp.segments;
+    }
+    if (ramp.fftResolution === 128 && currentFftResolution === 64 && !fftUpgradeDone) {
+      fftUpgradeDone = true;
+      activeOceanSystem = createOceanSystemAtResolution(renderer, MAVERICKS_SEA, 128);
+      updateOceanMaterialTextures(oceanMaterial, activeOceanSystem.cascades);
+      currentFftResolution = 128;
+      bootBudget.mark('fftTier128');
+    }
+    oceanMaterial.uniforms.foamScale.value = storedFoamScale * ramp.fxScale;
+    oceanMaterial.uniforms.detailStrength.value = storedDetailStrength * ramp.fxScale;
+
+    if (ramp.settled && !rampSettled) {
+      rampSettled = true;
+      bootBudget.mark('qualityRampSettled');
+      console.info('[mavericks] quality ramp settled', ramp);
+    }
+    if (window.__soundingSea) {
+      window.__soundingSea.qualityRamp = ramp;
+    }
 
     if (!bootSettled) {
       bootBudget.mark('fullyReady');
@@ -699,13 +747,13 @@ export async function bootSeaStage(mount, params) {
     }
 
     if (layerFlags.fft) {
-      oceanSystem.update(elapsed, dt);
-      updateOceanMaterialTextures(oceanMaterial, oceanSystem.cascades);
+      activeOceanSystem.update(elapsed, dt);
+      updateOceanMaterialTextures(oceanMaterial, activeOceanSystem.cascades);
     }
     oceanMaterial.uniforms.time.value = elapsed;
 
     const gpuDisp = surfaceProbe.sample(
-      oceanSystem.cascades,
+      activeOceanSystem.cascades,
       oceanMaterial,
       buoyXz.x,
       buoyXz.z,
@@ -716,7 +764,7 @@ export async function bootSeaStage(mount, params) {
 
     if (alignmentChecks < maxAlignmentChecks) {
       const cascade = heightProbe.sample(
-        oceanSystem.cascades,
+        activeOceanSystem.cascades,
         buoyXz.x,
         buoyXz.z,
       );
@@ -762,9 +810,10 @@ export async function bootSeaStage(mount, params) {
       buoy.group.position.y = mslY + buoy.dynamics.heave;
     }
 
-    const sprayLevel = layerFlags.spray
-      ? updateSprayLevel(sprayState, setWave, dt, eta)
-      : 0;
+    const sprayLevel =
+      layerFlags.spray && ramp.fxScale > 0.85
+        ? updateSprayLevel(sprayState, setWave, dt, eta)
+        : 0;
     if (buoySpray) {
       buoySpray.update({ level: sprayLevel, dt, camera });
     }
