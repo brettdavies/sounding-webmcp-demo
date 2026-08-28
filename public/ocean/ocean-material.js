@@ -11,6 +11,113 @@ const skyFunction = `
   }
 `;
 
+/** Shared wave displacement (FFT scale + ambient swell + heat face). Used by ocean mesh + buoy probe. */
+export const OCEAN_WAVE_DISPLACEMENT_GLSL = `
+      uniform float heatActive;
+      uniform float heatAmplitude;
+      uniform float heatSteepness;
+      uniform float heatK;
+      uniform float heatWidth;
+      uniform float heatCrestAlong;
+      uniform vec2 heatDirection;
+      uniform float cascadeScale;
+      uniform float swellAmplitude;
+      uniform float swellSteepness;
+      uniform float swellK;
+      uniform float swellOmega;
+      uniform vec2 swellDirection;
+      uniform float swell2Amplitude;
+      uniform float swell2Steepness;
+      uniform float swell2K;
+      uniform float swell2Omega;
+      uniform vec2 swell2Direction;
+      // time is declared by the host vertex/fragment shader.
+
+      vec3 gerstnerWave(vec2 xz, vec2 dir, float amp, float steep, float k, float omega, float t) {
+        float phase = k * dot(xz, dir) - omega * t;
+        float sinP = sin(phase);
+        float cosP = cos(phase);
+        return vec3(
+          -dir.x * steep * amp * sinP,
+          amp * cosP,
+          -dir.y * steep * amp * sinP
+        );
+      }
+
+      vec3 ambientSwell(vec2 xz) {
+        return gerstnerWave(xz, swellDirection, swellAmplitude, swellSteepness, swellK, swellOmega, time)
+          + gerstnerWave(xz, swell2Direction, swell2Amplitude, swell2Steepness, swell2K, swell2Omega, time);
+      }
+
+      vec3 heatDisplacement(vec2 xz) {
+        vec3 total = ambientSwell(xz);
+        if (heatActive < 0.01 || heatAmplitude < 0.01) {
+          return total;
+        }
+        float along = dot(xz, heatDirection);
+        float xi = along - heatCrestAlong;
+        float env = exp(-(xi * xi) / max(heatWidth * heatWidth, 1.0));
+        float mixW = heatActive * env;
+        float phase = heatK * xi;
+        float sinP = sin(phase);
+        float cosP = cos(phase);
+        float amp = heatAmplitude * mixW;
+        total += vec3(
+          -heatDirection.x * heatSteepness * amp * sinP,
+          amp * cosP,
+          -heatDirection.y * heatSteepness * amp * sinP
+        );
+        return total;
+      }
+`;
+
+export const OCEAN_DISPLACEMENT_UNIFORM_KEYS = [
+  "heatActive",
+  "heatAmplitude",
+  "heatSteepness",
+  "heatK",
+  "heatWidth",
+  "heatCrestAlong",
+  "heatDirection",
+  "cascadeScale",
+  "swellAmplitude",
+  "swellSteepness",
+  "swellK",
+  "swellOmega",
+  "swellDirection",
+  "swell2Amplitude",
+  "swell2Steepness",
+  "swell2K",
+  "swell2Omega",
+  "swell2Direction",
+  "time",
+];
+
+/**
+ * @param {Record<string, { value: unknown }>} target
+ * @param {Record<string, { value: unknown }>} source
+ */
+export function syncOceanDisplacementUniforms(target, source) {
+  for (const key of OCEAN_DISPLACEMENT_UNIFORM_KEYS) {
+    const src = source[key];
+    const dst = target[key];
+    if (!src || !dst) continue;
+    const value = src.value;
+    if (
+      value &&
+      typeof value === "object" &&
+      "copy" in value &&
+      typeof dst.value === "object" &&
+      dst.value &&
+      "copy" in dst.value
+    ) {
+      dst.value.copy(value);
+    } else {
+      dst.value = value;
+    }
+  }
+}
+
 export function createOceanMaterial(cascades, options) {
   const dem = options.dem ?? null;
   const uniforms = {
@@ -77,62 +184,7 @@ export function createOceanMaterial(cascades, options) {
   };
 
   const heatGerstnerGlsl = `
-      uniform float heatActive;
-      uniform float heatAmplitude;
-      uniform float heatSteepness;
-      uniform float heatK;
-      uniform float heatWidth;
-      uniform float heatCrestAlong;
-      uniform vec2 heatDirection;
-      uniform float cascadeScale;
-      uniform float swellAmplitude;
-      uniform float swellSteepness;
-      uniform float swellK;
-      uniform float swellOmega;
-      uniform vec2 swellDirection;
-      uniform float swell2Amplitude;
-      uniform float swell2Steepness;
-      uniform float swell2K;
-      uniform float swell2Omega;
-      uniform vec2 swell2Direction;
-      // time is declared by the host vertex/fragment shader.
-
-      vec3 gerstnerWave(vec2 xz, vec2 dir, float amp, float steep, float k, float omega, float t) {
-        float phase = k * dot(xz, dir) - omega * t;
-        float sinP = sin(phase);
-        float cosP = cos(phase);
-        return vec3(
-          -dir.x * steep * amp * sinP,
-          amp * cosP,
-          -dir.y * steep * amp * sinP
-        );
-      }
-
-      vec3 ambientSwell(vec2 xz) {
-        return gerstnerWave(xz, swellDirection, swellAmplitude, swellSteepness, swellK, swellOmega, time)
-          + gerstnerWave(xz, swell2Direction, swell2Amplitude, swell2Steepness, swell2K, swell2Omega, time);
-      }
-
-      vec3 heatDisplacement(vec2 xz) {
-        vec3 total = ambientSwell(xz);
-        if (heatActive < 0.01 || heatAmplitude < 0.01) {
-          return total;
-        }
-        float along = dot(xz, heatDirection);
-        float xi = along - heatCrestAlong;
-        float env = exp(-(xi * xi) / max(heatWidth * heatWidth, 1.0));
-        float mixW = heatActive * env;
-        float phase = heatK * xi;
-        float sinP = sin(phase);
-        float cosP = cos(phase);
-        float amp = heatAmplitude * mixW;
-        total += vec3(
-          -heatDirection.x * heatSteepness * amp * sinP,
-          amp * cosP,
-          -heatDirection.y * heatSteepness * amp * sinP
-        );
-        return total;
-      }
+      ${OCEAN_WAVE_DISPLACEMENT_GLSL}
 
       vec3 heatNormalDelta(vec2 xz) {
         // Approximate slopes from primary heat face only (ambient is low-frequency).

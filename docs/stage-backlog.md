@@ -14,7 +14,7 @@ Phased implementation order, async user assets, and definition of done. Each sli
 - [x] **Skill router inventory** — all 35 `.cursor/skills/` entries routed in `threejs-skill-router` (+ Sounding quick
   route)
 - [x] Ocean height mask vs DEM (no water on land, no dry cliff shelf in trough)
-- [ ] GPU displacement aligned with CPU buoy sample
+- [x] GPU displacement aligned with CPU buoy sample
 - [ ] All `MAVERICKS_VIEWS` verified at MHHW
 - [x] **Station / pillar XZ ↔ DEM elevation reconciled** (`meta.json` 2026-08-27)
 - [x] Wire reconciled pins into `mavericks-terrain.js` views, `sea-state.js`, buoy mooring QA

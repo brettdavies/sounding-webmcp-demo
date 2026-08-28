@@ -13,6 +13,10 @@ import { createOceanDetailTexture } from '../ocean/detail-texture.js';
 import { loadBuoy } from './buoy.js';
 import { HeightProbe } from './height-probe.js';
 import {
+  logBuoyAlignment,
+  SurfaceProbe,
+} from './surface-probe.js';
+import {
   ambientSwellAt,
   applyHeatUniforms,
   buildHeatSchedule,
@@ -176,6 +180,8 @@ export async function bootSeaStage(mount, params) {
   oceanMaterial.uniforms.sunDirection.value.copy(sunDirection);
   skyMaterial.uniforms.sunDirection.value.copy(sunDirection);
 
+  const surfaceProbe = new SurfaceProbe(renderer, MAVERICKS_SEA.patchLengths);
+  /** @deprecated cascade-only probe kept for regression compare during alignment QA */
   const heightProbe = new HeightProbe(renderer, MAVERICKS_SEA.patchLengths);
 
   /** @type {Awaited<ReturnType<typeof loadBuoy>> | null} */
@@ -273,6 +279,9 @@ export async function bootSeaStage(mount, params) {
     oceanMaterial.uniforms.debugMode.value = Number(debugParam) || 0;
   }
 
+  let alignmentChecks = 0;
+  const maxAlignmentChecks = 120;
+
   const tick = (ts) => {
     if (disposed) return;
     frameId = requestAnimationFrame(tick);
@@ -287,19 +296,41 @@ export async function bootSeaStage(mount, params) {
     updateOceanMaterialTextures(oceanMaterial, oceanSystem.cascades);
     oceanMaterial.uniforms.time.value = elapsed;
 
-    const cascade = heightProbe.sample(
+    const gpuDisp = surfaceProbe.sample(
       oceanSystem.cascades,
+      oceanMaterial,
       buoyXz.x,
       buoyXz.z,
     );
-    const cascadeScale = oceanMaterial.uniforms.cascadeScale.value;
-    const face = heatDisplacementAt(heat, buoyXz.x, buoyXz.z);
-    const swell = ambientSwellAt(heatSchedule, elapsed, buoyXz.x, buoyXz.z);
+    const eta = gpuDisp.y;
+    const dispX = gpuDisp.x;
+    const dispZ = gpuDisp.z;
 
-    // Free-surface kinematics relative to still water (MSL); world Y = MSL + η.
-    const eta = cascade.y * cascadeScale + face.y + swell.y;
-    const dispX = cascade.x * cascadeScale + face.x + swell.x;
-    const dispZ = cascade.z * cascadeScale + face.z + swell.z;
+    if (alignmentChecks < maxAlignmentChecks) {
+      const cascade = heightProbe.sample(
+        oceanSystem.cascades,
+        buoyXz.x,
+        buoyXz.z,
+      );
+      const cascadeScale = oceanMaterial.uniforms.cascadeScale.value;
+      const face = heatDisplacementAt(heat, buoyXz.x, buoyXz.z);
+      const swell = ambientSwellAt(heatSchedule, elapsed, buoyXz.x, buoyXz.z);
+      const cpuEta = cascade.y * cascadeScale + face.y + swell.y;
+      const cpuDisp = new THREE.Vector3(
+        cascade.x * cascadeScale + face.x + swell.x,
+        cpuEta,
+        cascade.z * cascadeScale + face.z + swell.z,
+      );
+      surfaceProbe.recordAlignment(gpuDisp, cpuDisp);
+      alignmentChecks += 1;
+      if (alignmentChecks === maxAlignmentChecks) {
+        logBuoyAlignment(surfaceProbe.alignment);
+        if (window.__soundingSea) {
+          window.__soundingSea.buoyAlignment = surfaceProbe.alignment;
+        }
+      }
+    }
+
     const slopeX = THREE.MathUtils.clamp(dispX * 0.045, -0.55, 0.55);
     const slopeZ = THREE.MathUtils.clamp(dispZ * 0.045, -0.55, 0.55);
 
@@ -361,6 +392,7 @@ export async function bootSeaStage(mount, params) {
       sky.geometry.dispose();
       skyMaterial.dispose();
       detailTexture.dispose();
+      surfaceProbe.dispose();
       heightProbe.dispose();
       buoy?.dispose();
       dem?.dispose();
