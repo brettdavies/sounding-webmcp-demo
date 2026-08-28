@@ -29,6 +29,7 @@ import {
   verifyBreakStyleDistribution,
   STAGE_BREAK_SEED,
 } from './break-style.js';
+import { lipFoamCompositeAt } from './lip-foam-jacobian.js';
 import { loadEnvironment } from './land.js';
 import {
   MAVERICKS_VIEWS,
@@ -291,6 +292,7 @@ export async function bootSeaStage(mount, params) {
     cliffQa: terrain?.cliffQa ?? null,
     crestLine,
     breakStyles,
+    lipFoam: null,
     mslY,
     buoyXz,
     ready: false,
@@ -328,6 +330,14 @@ export async function bootSeaStage(mount, params) {
 
     const setWave = sampleSetWave(setWaveSchedule, elapsed);
     applySetWaveUniforms(oceanMaterial, setWave, setWaveSchedule);
+    if (window.__soundingSea) {
+      window.__soundingSea.lipFoam = lipFoamCompositeAt(
+        setWave,
+        buoyXz.x,
+        buoyXz.z,
+        setWaveSchedule,
+      );
+    }
 
     oceanSystem.update(elapsed, dt);
     updateOceanMaterialTextures(oceanMaterial, oceanSystem.cascades);

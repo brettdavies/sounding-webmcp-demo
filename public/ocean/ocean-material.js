@@ -108,6 +108,49 @@ export const OCEAN_WAVE_DISPLACEMENT_GLSL = `
         );
         return total;
       }
+
+      vec3 setWaveFaceOnly(vec2 xz) {
+        if (setWaveActive < 0.01 || setWaveAmplitude < 0.01) {
+          return vec3(0.0);
+        }
+        float xi = setWaveXiCurved(xz);
+        float env = exp(-(xi * xi) / max(setWaveWidth * setWaveWidth, 1.0));
+        float mixW = setWaveActive * env;
+        float phase = setWaveK * xi;
+        float sinP = sin(phase);
+        float cosP = cos(phase);
+        float amp = setWaveAmplitude * mixW;
+        float phaseLip = phase + setWaveLipSkew * sinP;
+        float tubeHollow = setWaveTubeMix * mixW * sin(phaseLip * 2.0 + 1.4);
+        float horiz = setWaveHorizMul;
+        return vec3(
+          -setWaveDirection.x * setWaveSteepness * amp * sinP * horiz,
+          amp * cosP + tubeHollow,
+          -setWaveDirection.y * setWaveSteepness * amp * sinP * horiz
+        );
+      }
+
+      float setWaveLipJacobian(vec2 xz) {
+        float eps = 3.0;
+        vec3 d0 = setWaveFaceOnly(xz);
+        vec3 dx = setWaveFaceOnly(xz + vec2(eps, 0.0)) - d0;
+        vec3 dz = setWaveFaceOnly(xz + vec2(0.0, eps)) - d0;
+        float jxx = 1.0 + dx.x / eps;
+        float jzz = 1.0 + dz.z / eps;
+        float jxz = 0.5 * (dx.z / eps + dz.x / eps);
+        float j = jxx * jzz - jxz * jxz;
+        return clamp(1.05 - j, 0.0, 1.0) * setWaveActive;
+      }
+
+      float setWaveTubeLipRing(vec2 xz) {
+        if (setWaveBreakStyle < 1.5 || setWaveActive < 0.01) {
+          return 0.0;
+        }
+        float xi = setWaveXiCurved(xz);
+        float ring = abs(sin(setWaveK * xi * 2.0 + 1.4));
+        return setWaveActive * setWaveTubeMix *
+          smoothstep(0.25, 0.55, ring) * (1.0 - smoothstep(0.55, 0.75, ring));
+      }
 `;
 
 export const OCEAN_DISPLACEMENT_UNIFORM_KEYS = [
@@ -433,9 +476,20 @@ export function createOceanMaterial(cascades, options) {
         float foamRaw =
           clamp((foamThreshold - displacementA.a) * foamScale, 0.0, 1.0) +
           clamp((foamThreshold - displacementB.a) * foamScale, 0.0, 1.0);
-        float setWaveFoam = smoothstep(4.0, 12.0, setWaveHeightVarying) * setWaveActive * 0.45;
-        float styleFoam = setWaveBreakStyle * 0.08 + setWaveTubeMix * 0.35;
-        float foamCoverage = smoothstep(0.2, 0.9, foamRaw + setWaveFoam + styleFoam * setWaveActive);
+        float cascadeFoam = foamRaw;
+        float lipJacobian = setWaveLipJacobian(oceanPosition);
+        float lipFoam =
+          lipJacobian *
+          smoothstep(2.0, 11.0, setWaveHeightVarying) *
+          0.92;
+        float tubeLip = setWaveTubeLipRing(oceanPosition) * lipJacobian * 1.35;
+        float setWaveFoam =
+          smoothstep(4.0, 12.0, setWaveHeightVarying) * setWaveActive * 0.35;
+        float foamCoverage = smoothstep(
+          0.12,
+          0.88,
+          cascadeFoam + lipFoam + tubeLip + setWaveFoam
+        );
 
         if (debugMode == 1) {
           vec3 bands =
@@ -463,6 +517,15 @@ export function createOceanMaterial(cascades, options) {
           float margin = worldPositionVarying.y - demParams.z - terrainY;
           outputColor = vec4(
             margin > 0.0 ? vec3(0.08, 0.45, 0.95) : vec3(0.95, 0.18, 0.08),
+            1.0
+          );
+          return;
+        }
+        if (debugMode == 5) {
+          float lipJ = setWaveLipJacobian(oceanPosition);
+          float tubeRing = setWaveTubeLipRing(oceanPosition);
+          outputColor = vec4(
+            mix(vec3(0.04, 0.12, 0.2), vec3(0.95, 0.98, 1.0), clamp(lipJ + tubeRing, 0.0, 1.0)),
             1.0
           );
           return;
