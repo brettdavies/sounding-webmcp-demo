@@ -18,6 +18,12 @@ import {
   createOceanSystemAtResolution,
   setOceanSegmentTier,
 } from './quality-ramp-ocean.js';
+import {
+  createPerfGate,
+  effectiveOceanSegments,
+  shouldUpdateOceanFft,
+  verifyPerfGate,
+} from './perf-gate.js';
 import { SpectralOceanSystem } from '../ocean/ocean-system.js';
 import {
   createOceanMaterial,
@@ -98,7 +104,9 @@ import {
  */
 export async function bootSeaStage(mount, params) {
   const bootBudget = createBootBudget({ mode: 'sea' });
-  const perfMonitor = params.get('debug') === 'perf' ? createPerfMonitor() : null;
+  const perfMonitor = createPerfMonitor();
+  const perfGate = createPerfGate();
+  const perfDebug = params.get('debug') === 'perf';
   const viewName = params.get('view') || 'fallaway';
   let mslY = MSL_Y;
   const view = MAVERICKS_VIEWS[viewName] || {
@@ -371,6 +379,10 @@ export async function bootSeaStage(mount, params) {
   console.info('[mavericks] layer controls', layerVerify);
   const qualityRampVerify = verifyQualityRamp();
   console.info('[mavericks] quality ramp', qualityRampVerify);
+  console.info(
+    '[mavericks] perf gate',
+    verifyPerfGate({ fps: 0, tier: 0, rampSettled: false, samples: 0 }),
+  );
 
   const publishBootState = () => {
     const budget = bootBudget.snapshot();
@@ -616,7 +628,7 @@ export async function bootSeaStage(mount, params) {
     reefWash: { level: 0, peak: reefPeak },
     spray: { level: 0 },
     budget: bootBudget.snapshot(),
-    perf: perfMonitor ? perfMonitor.snapshot() : null,
+    perf: perfMonitor.snapshot(),
     bootVerify,
     view: currentView,
     setWave: lastSetWave,
@@ -627,6 +639,7 @@ export async function bootSeaStage(mount, params) {
     placeholder: verifyPlaceholderBoot(bootBudget.snapshot()),
     qualityRamp: sampleQualityRamp(0),
     qualityRampVerify,
+    perfGate: perfGate.snapshot(),
   };
   window.__soundingBoot = window.__soundingSea;
   console.info('[mavericks] boot budget', window.__soundingBoot.budget);
@@ -655,6 +668,7 @@ export async function bootSeaStage(mount, params) {
   let rampElapsed = 0;
   let currentSegments = bootSegments;
   let rampSettled = false;
+  let frameIndex = 0;
 
   const tick = (ts) => {
     if (disposed) return;
@@ -663,15 +677,26 @@ export async function bootSeaStage(mount, params) {
       cancelAnimationFrame(placeholderSpinId);
     }
     frameId = requestAnimationFrame(tick);
+    frameIndex += 1;
     const dt = Math.min((ts - lastTs) / 1000, 0.05);
     lastTs = ts;
     elapsed += dt;
     rampElapsed += dt;
     const ramp = sampleQualityRamp(rampElapsed);
 
-    if (ramp.segments !== currentSegments) {
-      setOceanSegmentTier(oceanMesh, ramp.segments);
-      currentSegments = ramp.segments;
+    perfMonitor.tick(dt);
+    const perfSnap = perfMonitor.snapshot();
+    const gateSnap = perfGate.tick({
+      fps: perfSnap.fps,
+      rampSettled: ramp.settled,
+      samples: perfSnap.samples,
+    });
+    const perfProfile = gateSnap.profile;
+    const targetSegments = effectiveOceanSegments(ramp, gateSnap.tier);
+
+    if (targetSegments !== currentSegments) {
+      setOceanSegmentTier(oceanMesh, targetSegments);
+      currentSegments = targetSegments;
     }
     if (ramp.fftResolution === 128 && currentFftResolution === 64 && !fftUpgradeDone) {
       fftUpgradeDone = true;
@@ -680,8 +705,10 @@ export async function bootSeaStage(mount, params) {
       currentFftResolution = 128;
       bootBudget.mark('fftTier128');
     }
-    oceanMaterial.uniforms.foamScale.value = storedFoamScale * ramp.fxScale;
-    oceanMaterial.uniforms.detailStrength.value = storedDetailStrength * ramp.fxScale;
+    oceanMaterial.uniforms.foamScale.value =
+      storedFoamScale * ramp.fxScale * perfProfile.fxMul;
+    oceanMaterial.uniforms.detailStrength.value =
+      storedDetailStrength * ramp.fxScale * perfProfile.fxMul;
 
     if (ramp.settled && !rampSettled) {
       rampSettled = true;
@@ -690,6 +717,11 @@ export async function bootSeaStage(mount, params) {
     }
     if (window.__soundingSea) {
       window.__soundingSea.qualityRamp = ramp;
+      window.__soundingSea.perf = perfSnap;
+      window.__soundingSea.perfGate = gateSnap;
+      if (perfDebug && gateSnap.gateArmed && frameIndex % 120 === 0) {
+        console.info('[mavericks] perf gate', gateSnap);
+      }
     }
 
     if (!bootSettled) {
@@ -697,12 +729,6 @@ export async function bootSeaStage(mount, params) {
       bootSettled = true;
       publishBootState();
       console.info('[mavericks] boot budget (settled)', window.__soundingBoot?.bootVerify);
-    }
-    if (perfMonitor) {
-      perfMonitor.tick(dt);
-      if (window.__soundingSea) {
-        window.__soundingSea.perf = perfMonitor.snapshot();
-      }
     }
 
     const setWave = sampleSetWave(setWaveSchedule, elapsed);
@@ -746,7 +772,7 @@ export async function bootSeaStage(mount, params) {
       );
     }
 
-    if (layerFlags.fft) {
+    if (layerFlags.fft && shouldUpdateOceanFft(frameIndex, perfProfile.fftSkip)) {
       activeOceanSystem.update(elapsed, dt);
       updateOceanMaterialTextures(oceanMaterial, activeOceanSystem.cascades);
     }
@@ -811,7 +837,7 @@ export async function bootSeaStage(mount, params) {
     }
 
     const sprayLevel =
-      layerFlags.spray && ramp.fxScale > 0.85
+      layerFlags.spray && ramp.fxScale > 0.85 && perfProfile.spray
         ? updateSprayLevel(sprayState, setWave, dt, eta)
         : 0;
     if (buoySpray) {
