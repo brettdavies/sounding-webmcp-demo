@@ -11,7 +11,7 @@ Phased implementation order, async user assets, and definition of done. Each sli
 
 ### P0 — Shoreline integrity (current priority)
 
-- [ ] **Skill router inventory** — all 35 `.cursor/skills/` entries routed in `threejs-skill-router` (+ Sounding quick
+- [x] **Skill router inventory** — all 35 `.cursor/skills/` entries routed in `threejs-skill-router` (+ Sounding quick
   route)
 - [ ] Ocean height mask vs DEM (no water on land, no dry cliff shelf in trough)
 - [ ] GPU displacement aligned with CPU buoy sample
