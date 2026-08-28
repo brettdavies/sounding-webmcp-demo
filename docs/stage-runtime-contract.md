@@ -29,11 +29,14 @@ DEM mesh in views where cliffs are on screen.
 
 ## Evidence gate (every slice)
 
-Do **not** advance backlog phases until all three are true for the current slice:
+Do **not** advance backlog phases until the evidence gate is satisfied for the current slice:
 
-1. **Data logs** — console or `window.__soundingBoot` / `?debug=perf` marks recorded in the commit message.
-2. **Screenshot** — `scripts/save-picture.sh` → `.context/pictures/{epoch}_{slug}`.
-3. **Commit** — one conventional commit on the feature branch.
+1. **Data logs** — console or `window.__soundingBoot` / `?debug=perf` marks recorded in the commit message (**always**).
+2. **Screenshot** — **visual slices only** — `scripts/save-picture.sh` → `.context/pictures/{epoch}_{slug}` (50% pixel
+   dimensions + JPEG by default). The image must demonstrate the slice change (matching URL/view/debug/UI), not an
+   arbitrary frame. **Non-visual slices** (rename-only, verify scripts, docs, wiring with no render delta): omit
+   screenshot; write `Screenshot: n/a (non-visual)` in the commit body.
+3. **Commit** — one conventional commit on the feature branch (**always**).
 
 Operational steps (template, granularity, memory updates): `.cursor/rules/stage-slices.mdc` ·
 `.cursor/commit-template-stage.md`.

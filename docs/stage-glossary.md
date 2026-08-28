@@ -179,7 +179,7 @@ The **scene graph** is a tree of objects the renderer draws each frame. Three.js
 | **Tier**             | Quality preset ramping resolution or features over time.           | FFT 64→128, segment count, async HDRI during progressive boot.   |
 | **Z-fighting**       | Flickering when two surfaces occupy the same depth.                | Hard constraint — fix with clip planes, shoreline mask, or bias. |
 | **Progressive boot** | Placeholder → full quality within ~2 s.                            | [`stage-runtime-contract.md`](stage-runtime-contract.md)         |
-| **Evidence gate**    | Logs + screenshot + commit per shipped slice.                      | [`stage-runtime-contract.md`](stage-runtime-contract.md)         |
+| **Evidence gate**    | Logs + commit per slice; screenshot when the change is visual.     | [`stage-runtime-contract.md`](stage-runtime-contract.md)         |
 
 ---
 
