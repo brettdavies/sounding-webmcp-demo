@@ -287,6 +287,14 @@ export function createOceanMaterial(cascades, options) {
       ),
     },
     demClipEnabled: { value: dem ? 1 : 0 },
+    shoreWash: { value: 0 },
+    shoreCenter: {
+      value: new THREE.Vector2(
+        options.shoreCenter?.x ?? -100,
+        options.shoreCenter?.z ?? 100,
+      ),
+    },
+    shoreRadius: { value: options.shoreRadius ?? 130 },
   };
 
   const setWaveGerstnerGlsl = `
@@ -322,6 +330,9 @@ export function createOceanMaterial(cascades, options) {
       uniform vec3 demParams;
       uniform vec2 demGrid;
       uniform float demClipEnabled;
+      uniform float shoreWash;
+      uniform vec2 shoreCenter;
+      uniform float shoreRadius;
 
       float sampleDemHeight(vec2 xz) {
         float col = (xz.x + demParams.x) / demParams.y;
@@ -331,6 +342,15 @@ export function createOceanMaterial(cascades, options) {
           return -1e6;
         }
         return texture(demHeightMap, uv).r;
+      }
+
+      float shoreWhitewashMask(vec2 xz, float waterY) {
+        float dist = length(xz - shoreCenter);
+        float zone = 1.0 - smoothstep(shoreRadius * 0.32, shoreRadius, dist);
+        float terrainY = sampleDemHeight(xz);
+        float margin = waterY - terrainY;
+        float shallow = smoothstep(-0.5, 2.8, margin);
+        return zone * shallow;
       }
   `;
 
@@ -485,10 +505,12 @@ export function createOceanMaterial(cascades, options) {
         float tubeLip = setWaveTubeLipRing(oceanPosition) * lipJacobian * 1.35;
         float setWaveFoam =
           smoothstep(4.0, 12.0, setWaveHeightVarying) * setWaveActive * 0.35;
+        float shoreFoam =
+          shoreWash * shoreWhitewashMask(oceanPosition, worldPositionVarying.y) * 0.82;
         float foamCoverage = smoothstep(
           0.12,
           0.88,
-          cascadeFoam + lipFoam + tubeLip + setWaveFoam
+          cascadeFoam + lipFoam + tubeLip + setWaveFoam + shoreFoam
         );
 
         if (debugMode == 1) {
@@ -526,6 +548,14 @@ export function createOceanMaterial(cascades, options) {
           float tubeRing = setWaveTubeLipRing(oceanPosition);
           outputColor = vec4(
             mix(vec3(0.04, 0.12, 0.2), vec3(0.95, 0.98, 1.0), clamp(lipJ + tubeRing, 0.0, 1.0)),
+            1.0
+          );
+          return;
+        }
+        if (debugMode == 6) {
+          float shoreMask = shoreWhitewashMask(oceanPosition, worldPositionVarying.y);
+          outputColor = vec4(
+            mix(vec3(0.04, 0.12, 0.2), vec3(0.95, 0.98, 1.0), clamp(shoreWash * shoreMask, 0.0, 1.0)),
             1.0
           );
           return;

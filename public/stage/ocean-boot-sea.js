@@ -34,6 +34,11 @@ import {
   applyOverlayReadout,
   overlayReadout,
 } from './overlay-readout.js';
+import {
+  updateShoreWash,
+  verifyShoreWhitewash,
+  SHORE_RADIUS_M,
+} from './shore-whitewash.js';
 import { loadEnvironment } from './land.js';
 import {
   MAVERICKS_VIEWS,
@@ -162,12 +167,15 @@ export async function bootSeaStage(mount, params) {
   });
 
   const detailTexture = createOceanDetailTexture(512, MAVERICKS_SEA.seed);
+  const shoreCenter = pins.spectators ?? { x: -100, z: 100 };
   const oceanMaterial = createOceanMaterial(oceanSystem.cascades, {
     patchLengths: MAVERICKS_SEA.patchLengths,
     sunDirection,
     detailTexture,
     dem,
     shorelineBias: 0.08,
+    shoreCenter,
+    shoreRadius: SHORE_RADIUS_M,
   });
   oceanMaterial.uniforms.foamScale.value = 0.7;
   oceanMaterial.uniforms.foamThreshold.value = 0.2;
@@ -271,6 +279,8 @@ export async function bootSeaStage(mount, params) {
   );
   console.info('[mavericks] curved crest line', crestLine);
   console.info('[mavericks] break styles', breakStyles);
+  const shoreWhitewash = verifyShoreWhitewash(shoreCenter);
+  console.info('[mavericks] shore whitewash', shoreWhitewash);
   const openerPeak = sampleSetWave(setWaveSchedule, 4);
   const overlayVerify = {
     ok:
@@ -370,6 +380,8 @@ export async function bootSeaStage(mount, params) {
       reading,
     }),
     overlayVerify,
+    shoreWhitewash,
+    shoreWash: { level: 0, center: shoreCenter },
     view: currentView,
     setWave: lastSetWave,
     mslY,
@@ -399,6 +411,7 @@ export async function bootSeaStage(mount, params) {
 
   let alignmentChecks = 0;
   const maxAlignmentChecks = 120;
+  const shoreWashState = { level: 0 };
 
   const tick = (ts) => {
     if (disposed) return;
@@ -409,6 +422,8 @@ export async function bootSeaStage(mount, params) {
 
     const setWave = sampleSetWave(setWaveSchedule, elapsed);
     applySetWaveUniforms(oceanMaterial, setWave, setWaveSchedule);
+    const shoreLevel = updateShoreWash(shoreWashState, setWave, dt);
+    oceanMaterial.uniforms.shoreWash.value = shoreLevel;
     if (window.__soundingSea) {
       window.__soundingSea.lipFoam = lipFoamCompositeAt(
         setWave,
@@ -416,6 +431,10 @@ export async function bootSeaStage(mount, params) {
         buoyXz.z,
         setWaveSchedule,
       );
+      window.__soundingSea.shoreWash = {
+        level: Number(shoreLevel.toFixed(4)),
+        center: shoreCenter,
+      };
     }
 
     oceanSystem.update(elapsed, dt);
