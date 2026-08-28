@@ -22,6 +22,8 @@ import {
   createPerfGate,
   effectiveOceanSegments,
   effectiveDpr,
+  effectiveRenderScale,
+  effectiveFftResolution,
   shouldUpdateOceanFft,
   verifyPerfGate,
 } from './perf-gate.js';
@@ -110,6 +112,13 @@ export async function bootSeaStage(mount, params) {
   const perfMonitor = createPerfMonitor();
   const perfGate = createPerfGate();
   const perfDebug = params.get('debug') === 'perf';
+  const perfTierParam = params.get('perf_tier');
+  if (perfTierParam != null && perfTierParam !== '') {
+    const forced = Number(perfTierParam);
+    if (Number.isFinite(forced)) {
+      perfGate.forceTier(forced);
+    }
+  }
   const viewName = params.get('view') || 'fallaway';
   let mslY = MSL_Y;
   const view = MAVERICKS_VIEWS[viewName] || {
@@ -123,7 +132,7 @@ export async function bootSeaStage(mount, params) {
   };
 
   const renderer = new THREE.WebGLRenderer({
-    antialias: true,
+    antialias: false,
     powerPreference: 'high-performance',
   });
   renderer.setPixelRatio(
@@ -242,7 +251,6 @@ export async function bootSeaStage(mount, params) {
   });
   let activeOceanSystem = oceanSystem;
   let currentFftResolution = 64;
-  let fftUpgradeDone = false;
 
   const detailTexture = createOceanDetailTexture(512, MAVERICKS_SEA.seed);
   const shoreCenter = pins.spectators ?? { x: -100, z: 100 };
@@ -289,8 +297,8 @@ export async function bootSeaStage(mount, params) {
   bootBudget.mark('placeholderSwap');
 
   const surfaceProbe = new SurfaceProbe(renderer, MAVERICKS_SEA.patchLengths);
-  /** @deprecated cascade-only probe kept for regression compare during alignment QA */
-  const heightProbe = new HeightProbe(renderer, MAVERICKS_SEA.patchLengths);
+  /** @type {import('./height-probe.js').HeightProbe | null} */
+  let heightProbe = null;
 
   /** @type {Awaited<ReturnType<typeof loadBuoy>> | null} */
   let buoy = null;
@@ -656,12 +664,21 @@ export async function bootSeaStage(mount, params) {
   let frameId = 0;
   let disposed = false;
 
-  const onResize = () => {
+  const applyViewport = () => {
     const width = mount.clientWidth;
     const height = Math.max(mount.clientHeight, 1);
     camera.aspect = width / height;
     camera.updateProjectionMatrix();
-    renderer.setSize(width, height, false);
+    const bw = Math.max(1, Math.floor(width * currentRenderScale));
+    const bh = Math.max(1, Math.floor(height * currentRenderScale));
+    renderer.setPixelRatio(currentDpr);
+    renderer.setSize(bw, bh, false);
+    renderer.domElement.style.width = `${width}px`;
+    renderer.domElement.style.height = `${height}px`;
+  };
+
+  const onResize = () => {
+    applyViewport();
   };
   window.addEventListener('resize', onResize);
 
@@ -677,6 +694,8 @@ export async function bootSeaStage(mount, params) {
   let rampSettled = false;
   let frameIndex = 0;
   let currentDpr = effectiveDpr(0, window.devicePixelRatio || 1);
+  let currentRenderScale = effectiveRenderScale(0);
+  let currentPerfTier = 0;
   /** @type {THREE.Vector3 | null} */
   let cachedBuoyDisp = null;
   let buoyDispValid = false;
@@ -689,6 +708,7 @@ export async function bootSeaStage(mount, params) {
     }
     frameId = requestAnimationFrame(tick);
     frameIndex += 1;
+    const workT0 = performance.now();
     const dt = Math.min((ts - lastTs) / 1000, 0.05);
     lastTs = ts;
     elapsed += dt;
@@ -699,29 +719,47 @@ export async function bootSeaStage(mount, params) {
     const perfSnap = perfMonitor.snapshot();
     const gateSnap = perfGate.tick({
       fps: perfSnap.fps,
+      workFps: perfSnap.workFps,
       rampSettled: ramp.settled,
       samples: perfSnap.samples,
     });
     const perfProfile = gateSnap.profile;
     const targetSegments = effectiveOceanSegments(ramp, gateSnap.tier);
     const targetDpr = effectiveDpr(gateSnap.tier, window.devicePixelRatio || 1);
+    const targetRenderScale = effectiveRenderScale(gateSnap.tier);
 
-    if (targetDpr !== currentDpr) {
+    if (
+      gateSnap.tier !== currentPerfTier ||
+      targetDpr !== currentDpr ||
+      targetRenderScale !== currentRenderScale
+    ) {
+      currentPerfTier = gateSnap.tier;
       currentDpr = targetDpr;
-      renderer.setPixelRatio(currentDpr);
-      onResize();
+      currentRenderScale = targetRenderScale;
+      applyViewport();
     }
 
     if (targetSegments !== currentSegments) {
       setOceanSegmentTier(oceanMesh, targetSegments);
       currentSegments = targetSegments;
     }
-    if (ramp.fftResolution === 128 && currentFftResolution === 64 && !fftUpgradeDone) {
-      fftUpgradeDone = true;
-      activeOceanSystem = createOceanSystemAtResolution(renderer, MAVERICKS_SEA, 128);
+    const targetFft = effectiveFftResolution(
+      ramp.settled ? 128 : ramp.fftResolution,
+      gateSnap.tier,
+    );
+    if (targetFft !== currentFftResolution) {
+      const previous = activeOceanSystem;
+      activeOceanSystem = createOceanSystemAtResolution(
+        renderer,
+        MAVERICKS_SEA,
+        targetFft,
+      );
       updateOceanMaterialTextures(oceanMaterial, activeOceanSystem.cascades);
-      currentFftResolution = 128;
-      bootBudget.mark('fftTier128');
+      previous.dispose();
+      currentFftResolution = targetFft;
+      if (targetFft === 128) {
+        bootBudget.mark('fftTier128');
+      }
     }
     oceanMaterial.uniforms.foamScale.value =
       storedFoamScale * ramp.fxScale * perfProfile.fxMul;
@@ -767,13 +805,11 @@ export async function bootSeaStage(mount, params) {
     oceanMaterial.uniforms.shoreWash.value = shoreLevel;
     oceanMaterial.uniforms.reefWash.value = reefLevel;
     if (window.__soundingSea) {
-      const lip = lipFoamCompositeAt(
-        setWave,
-        buoyXz.x,
-        buoyXz.z,
-        setWaveSchedule,
-      );
-      window.__soundingSea.lipFoam = lip;
+      const lip =
+        gateSnap.tier >= 3
+          ? { lipJ: 0 }
+          : lipFoamCompositeAt(setWave, buoyXz.x, buoyXz.z, setWaveSchedule);
+      window.__soundingSea.lipFoam = gateSnap.tier >= 3 ? null : lip;
       window.__soundingSea.shoreWash = {
         level: Number(shoreLevel.toFixed(4)),
         center: shoreCenter,
@@ -820,6 +856,9 @@ export async function bootSeaStage(mount, params) {
     const dispZ = gpuDisp.z;
 
     if (alignmentChecks < maxAlignmentChecks) {
+      if (!heightProbe) {
+        heightProbe = new HeightProbe(renderer, MAVERICKS_SEA.patchLengths);
+      }
       const cascade = heightProbe.sample(
         activeOceanSystem.cascades,
         buoyXz.x,
@@ -888,6 +927,10 @@ export async function bootSeaStage(mount, params) {
     refreshOverlay(setWave, eta);
 
     renderer.render(scene, camera);
+    if (perfDebug && ramp.settled) {
+      renderer.getContext().finish();
+    }
+    perfMonitor.tickWork(performance.now() - workT0);
   };
   requestAnimationFrame(tick);
 
@@ -905,11 +948,12 @@ export async function bootSeaStage(mount, params) {
       skyMaterial.dispose();
       detailTexture.dispose();
       surfaceProbe.dispose();
-      heightProbe.dispose();
+      heightProbe?.dispose();
       buoy?.dispose();
       buoySpray?.dispose();
       dem?.dispose();
       terrain?.dispose();
+      activeOceanSystem.dispose();
       renderer.dispose();
       mount.replaceChildren();
     },

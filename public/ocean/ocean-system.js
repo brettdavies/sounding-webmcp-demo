@@ -285,6 +285,23 @@ export class SpectralCascade {
     this.renderer.setRenderTarget(null);
   }
 
+  dispose() {
+    this.heightIFFT.dispose();
+    this.horizontalIFFT.dispose();
+    this.heightFrequency.dispose();
+    this.horizontalFrequency.dispose();
+    this.derivatives.dispose();
+    for (const target of this.displacementTargets) {
+      target.dispose();
+    }
+    this.heightEvolution.dispose();
+    this.horizontalEvolution.dispose();
+    this.assembleDisplacement.dispose();
+    this.assembleDerivatives.dispose();
+    this.mesh.geometry.dispose();
+    this.spectrum.dispose();
+  }
+
   get displacement() {
     return this.displacementTargets[this.currentDisplacement].texture;
   }
@@ -314,5 +331,11 @@ export class SpectralOceanSystem {
 
   update(time, dt) {
     for (const cascade of this.cascades) cascade.update(time, dt);
+  }
+
+  dispose() {
+    for (const cascade of this.cascades) {
+      cascade.dispose();
+    }
   }
 }

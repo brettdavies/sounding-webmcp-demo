@@ -114,12 +114,12 @@ Perf telemetry: `?debug=perf` → boot marks + frame budget.
 
 ## Progressive bootstrap & perf budget (target)
 
-| Milestone            | Wall clock    | What the user sees                       |
-| -------------------- | ------------- | ---------------------------------------- |
-| **First frame**      | **<100 ms**   | Sky + camera + placeholder terrain/ocean |
-| **Progressive ramp** | **0–1000 ms** | Segments ↑, FFT 64→128, async HDRI/GLB   |
-| **Fully ready**      | **≤2000 ms**  | Full default stage                       |
-| **Steady-state**     | **≥120 fps**  | After settle                             |
+| Milestone            | Wall clock    | What the user sees                                                                                       |
+| -------------------- | ------------- | -------------------------------------------------------------------------------------------------------- |
+| **First frame**      | **<100 ms**   | Sky + camera + placeholder terrain/ocean                                                                 |
+| **Progressive ramp** | **0–1000 ms** | Segments ↑, FFT 64→128, async HDRI/GLB                                                                   |
+| **Fully ready**      | **≤2000 ms**  | Full default stage                                                                                       |
+| **Steady-state**     | **≥120 fps**  | After settle; **60 Hz displays cap display fps ~60** — use `fpsSettleAudit().workFps` for GPU throughput |
 
 ### Perf budget — land is exempt from coarsening
 

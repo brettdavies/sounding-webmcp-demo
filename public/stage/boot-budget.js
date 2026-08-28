@@ -41,11 +41,13 @@ export function createBootBudget(options = {}) {
 export function createPerfMonitor() {
   let fpsEma = 0;
   let frameMsEma = 0;
+  let workFpsEma = 0;
+  let workMsEma = 0;
   let samples = 0;
   const alpha = 0.08;
 
   /**
-   * @param {number} dt seconds
+   * @param {number} dt seconds (display / rAF interval)
    */
   function tick(dt) {
     if (dt <= 0) return;
@@ -57,15 +59,30 @@ export function createPerfMonitor() {
     samples += 1;
   }
 
+  /**
+   * Per-frame work duration (sim + render) for uncapped throughput on vsync-limited displays.
+   * @param {number} workMs
+   */
+  function tickWork(workMs) {
+    if (workMs <= 0) return;
+    const workFps = 1000 / workMs;
+    workFpsEma =
+      samples <= 1 ? workFps : workFpsEma * (1 - alpha) + workFps * alpha;
+    workMsEma =
+      samples <= 1 ? workMs : workMsEma * (1 - alpha) + workMs * alpha;
+  }
+
   function snapshot() {
     return {
       fps: Number(fpsEma.toFixed(1)),
       frameMs: Number(frameMsEma.toFixed(2)),
+      workFps: Number(workFpsEma.toFixed(1)),
+      workMs: Number(workMsEma.toFixed(2)),
       samples,
     };
   }
 
-  return { tick, snapshot };
+  return { tick, tickWork, snapshot };
 }
 
 /**

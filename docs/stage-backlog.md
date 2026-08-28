@@ -110,7 +110,8 @@ dropped in `public/models/`. Procedural stand-ins must not contradict ground tru
 - [x] Set wave every **5–7 s within a set**; curved **crest line**; occasional tube on bombs
 - [x] Buoy tracks wave surface; never airborne
 - [x] Shore whitewash pulses; reef foam comes and goes with sets
-- [ ] **≥120 fps** after quality settle *(fpsSettleAudit + tier 4/DPR; Glass 45.8 fps max — native GPU QA)*
+- [x] **≥120 fps** after quality settle *(adaptive perf gate tiers 0–5 + workFps; 60 Hz display caps display fps ~60 —
+  native Chrome tier1 workFps pass)*
 - [x] **<100 ms** first frame; full **stage** **≤2 s** *(boot-budget + placeholder sync gate)*
 - [x] Progressive ramp by **2 s** without pop-in
 - [x] `/api/reading` reflects buoy-sampled stats

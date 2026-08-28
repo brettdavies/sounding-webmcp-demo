@@ -54,7 +54,7 @@ export const DEFINITION_OF_DONE_ITEMS = [
     label: '≥120 fps after quality settle',
     kind: 'hardware',
     scripts: ['verify-perf-gate', 'verify-fps-settle'],
-    note: 'Adaptive tier + DPR; fpsSettleAudit on __soundingBoot',
+    note: 'Adaptive tier 0–5 + workFps; 60 Hz display caps display fps; gl.finish only under ?debug=perf',
   },
   {
     id: 'boot-timing',

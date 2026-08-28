@@ -15,7 +15,7 @@ import {
   verifyFpsSettle,
   sampleFpsSettlePass,
 } from './public/stage/fps-settle-verify.js';
-import { effectiveDpr, PERF_OCEAN_TIERS } from './public/stage/perf-gate.js';
+import { effectiveDpr, PERF_OCEAN_TIERS, effectiveRenderScale } from './public/stage/perf-gate.js';
 
 const pass = sampleFpsSettlePass();
 const fail = verifyFpsSettle({
@@ -24,8 +24,9 @@ const fail = verifyFpsSettle({
   perfGate: { fps: 90, targetFps: 120, tier: 3, gateArmed: true, rampSettled: true, steadySamples: 64 },
 });
 const dpr = effectiveDpr(4, 2);
+const rs = effectiveRenderScale(4);
 const tiers = PERF_OCEAN_TIERS.length;
-console.log('fps-settle:', JSON.stringify({ pass, fail, dpr, tiers }, null, 2));
-if (!pass.ok || fail.ok || dpr !== 0.5 || tiers !== 5) process.exit(1);
-console.log('OK: fps settle target', pass.targetFps, 'tier4 dpr', dpr);
+console.log('fps-settle:', JSON.stringify({ pass, fail, dpr, rs, tiers }, null, 2));
+if (!pass.ok || fail.ok || dpr !== 0.5 || rs !== 0.45 || tiers !== 6) process.exit(1);
+console.log('OK: fps settle target', pass.targetFps, 'tier4 dpr', dpr, 'renderScale', rs);
 "

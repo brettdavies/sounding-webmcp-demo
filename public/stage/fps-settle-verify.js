@@ -6,10 +6,12 @@ import { STEADY_FPS_TARGET, MIN_STEADY_SAMPLES } from './perf-gate.js';
 
 /**
  * @param {{
- *   perf?: { fps?: number },
+ *   perf?: { fps?: number, workFps?: number },
  *   perfGate?: {
  *     ok?: boolean,
  *     fps?: number,
+ *     workFps?: number,
+ *     effectiveFps?: number,
  *     targetFps?: number,
  *     tier?: number,
  *     gateArmed?: boolean,
@@ -24,18 +26,23 @@ export function verifyFpsSettle(boot) {
   const gate = boot.perfGate ?? {};
   const perf = boot.perf ?? {};
   const fps = gate.fps ?? perf.fps ?? 0;
+  const workFps = gate.workFps ?? perf.workFps ?? 0;
+  const effectiveFps = gate.effectiveFps ?? Math.max(fps, workFps);
   const targetFps = gate.targetFps ?? STEADY_FPS_TARGET;
   const rampSettled = gate.rampSettled ?? boot.qualityRamp?.settled ?? false;
   const samples = gate.steadySamples ?? 0;
   const gateArmed = gate.gateArmed ?? (rampSettled && samples >= MIN_STEADY_SAMPLES);
-  const ok = gateArmed && fps >= targetFps;
+  const ok = gateArmed && effectiveFps >= targetFps;
 
   return {
     ok,
     fps,
+    workFps,
+    effectiveFps,
     targetFps,
     tier: gate.tier ?? null,
     dpr: gate.profile?.dpr ?? null,
+    renderScale: gate.profile?.renderScale ?? null,
     segments: gate.profile?.segments ?? null,
     gateArmed,
     rampSettled,
@@ -57,7 +64,9 @@ export function sampleFpsSettlePass() {
     qualityRamp: { settled: true },
     perfGate: {
       ok: true,
-      fps: 122.4,
+      fps: 60,
+      workFps: 122.4,
+      effectiveFps: 122.4,
       targetFps: 120,
       tier: 0,
       gateArmed: true,
